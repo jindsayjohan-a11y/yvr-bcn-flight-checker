@@ -17,12 +17,15 @@ Daily (and on-demand) price checks for:
 2. Or keep it private and stay under **2,000 free minutes/month** (daily checks use ~30).
 3. In GitHub: **Settings → Billing → Budgets** → set Actions budget to **$0** so nothing can ever charge.
 
-## Price alerts (≤ CAD 1100)
+## Price alerts
 
-When the cheapest round-trip is **at or under CAD 1,100**:
+Email + GitHub Issue when any cabin hits its threshold (CAD, round-trip):
 
-1. **Email** to `bcw3bcw3@gmail.com` (needs Gmail App Password secrets below)
-2. GitHub **Issue** labeled `price-alert` as backup
+| Cabin | Alert at or under |
+|-------|-------------------|
+| Economy | **CAD 1,100** |
+| Premium economy | **CAD 1,600** |
+| Business | **CAD 2,500** |
 
 ### Enable email (free, no credit card)
 

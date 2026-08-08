@@ -8,16 +8,21 @@ from mailer import DEFAULT_EMAIL_TO, send_email
 
 def main() -> int:
     alert_ok = send_email(
-        subject="[SAMPLE] Price alert: YVR→BCN CAD 1,049 (at/under 1,100)",
+        subject="[SAMPLE] Price alert: YVR→BCN Economy CAD 1,049 · Premium economy CAD 1,520 · Business CAD 2,380",
         body=(
             "YVR → BCN price alert\n\n"
             "THIS IS A SAMPLE — not a real fare check.\n\n"
-            "Cheapest round-trip: CAD 1,049.00\n"
-            "Threshold: CAD 1,100\n"
-            "Outbound: 2027-07-17\n"
-            "Return: 2027-07-25\n"
-            "Airlines: Air Canada, Lufthansa\n"
-            "Checked: 2026-08-08 06:00 UTC\n\n"
+            "Checked: 2026-08-08 06:00 UTC\n"
+            "Return: 2027-07-25\n\n"
+            "Economy: CAD 1,049.00 (threshold CAD 1,100)\n"
+            "  Outbound: 2027-07-17\n"
+            "  Airlines: Air Canada, Lufthansa\n\n"
+            "Premium economy: CAD 1,520.00 (threshold CAD 1,600)\n"
+            "  Outbound: 2027-07-16\n"
+            "  Airlines: Air Canada\n\n"
+            "Business: CAD 2,380.00 (threshold CAD 2,500)\n"
+            "  Outbound: 2027-07-18\n"
+            "  Airlines: Lufthansa\n\n"
             "Confirm on Google Flights before booking:\n"
             "https://www.google.com/travel/flights\n"
         ),
