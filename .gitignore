@@ -9,3 +9,4 @@ venv/
 data/latest.json
 data/history.jsonl
 data/summary.md
+data/alert.json

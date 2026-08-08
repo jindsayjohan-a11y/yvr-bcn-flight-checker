@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 jobs:
   check:
@@ -26,6 +27,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Check YVR → BCN prices
+        id: prices
         run: python check_flights.py
 
       - name: Write job summary
@@ -37,6 +39,59 @@ jobs:
             echo "No summary produced (check logs)." >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      - name: Notify if at/under CAD 1100
+        if: steps.prices.outputs.alert == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const alert = JSON.parse(fs.readFileSync('data/alert.json', 'utf8'));
+            if (!alert.alert) {
+              core.info('No alert payload');
+              return;
+            }
+
+            const label = 'price-alert';
+            // Ensure label exists (ignore if already there)
+            try {
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: label,
+                color: 'd73a4a',
+                description: 'YVR→BCN fare at or under CAD 1100',
+              });
+            } catch (e) {
+              // 422 = already exists
+            }
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: label,
+              per_page: 5,
+            });
+
+            if (issues.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issues[0].number,
+                body: alert.body,
+              });
+              core.info(`Commented on existing alert issue #${issues[0].number}`);
+            } else {
+              const { data: issue } = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: alert.title,
+                body: alert.body,
+                labels: [label],
+              });
+              core.info(`Opened alert issue #${issue.number}`);
+            }
+
       - name: Upload price artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -46,5 +101,6 @@ jobs:
             data/latest.json
             data/summary.md
             data/history.jsonl
+            data/alert.json
           if-no-files-found: ignore
           retention-days: 90

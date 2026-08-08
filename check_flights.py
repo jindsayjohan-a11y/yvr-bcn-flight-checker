@@ -8,6 +8,7 @@ No API keys, no accounts, no credit card.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 from datetime import datetime, timezone
@@ -22,6 +23,7 @@ OUTBOUND_DATES = ("2027-07-16", "2027-07-17", "2027-07-18")
 RETURN_DATE = "2027-07-25"
 ADULTS = 1
 CURRENCY = "CAD"
+ALERT_BELOW_CAD = 1100.0  # notify when cheapest round-trip is at/under this
 PAUSE_SECONDS = 2  # be polite between date searches
 
 ROOT = Path(__file__).resolve().parent
@@ -29,6 +31,7 @@ DATA_DIR = ROOT / "data"
 HISTORY_PATH = DATA_DIR / "history.jsonl"
 LATEST_PATH = DATA_DIR / "latest.json"
 SUMMARY_PATH = DATA_DIR / "summary.md"
+ALERT_PATH = DATA_DIR / "alert.json"
 
 
 def cheapest_for_date(outbound: str) -> dict:
@@ -133,6 +136,13 @@ def build_summary(run: dict) -> str:
                 f"- vs last run: {arrow} {format_money(abs(delta), best['currency'])} "
                 f"(was {format_money(prev['price'], prev.get('currency', best['currency']))})"
             )
+        threshold = run.get("alert_below_cad", ALERT_BELOW_CAD)
+        if run.get("alert"):
+            lines.append(
+                f"- **ALERT:** at or under {CURRENCY} {threshold:,.0f} — GitHub Issue notification fired"
+            )
+        else:
+            lines.append(f"- Alert threshold: {CURRENCY} {threshold:,.0f} (not met)")
     else:
         lines.append(
             "No priced offers yet. July 2027 may still be outside airline publish windows — "
@@ -159,6 +169,14 @@ def load_previous_cheapest() -> dict | None:
     if not last:
         return None
     return last.get("cheapest")
+
+
+def write_github_output(name: str, value: str) -> None:
+    path = os.environ.get("GITHUB_OUTPUT")
+    if not path:
+        return
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(f"{name}={value}\n")
 
 
 def main() -> int:
@@ -195,6 +213,9 @@ def main() -> int:
     found = [r for r in results if r.get("found") and r.get("price") is not None]
     cheapest = min(found, key=lambda r: r["price"]) if found else None
     previous = load_previous_cheapest()
+    alert = bool(
+        cheapest and cheapest.get("found") and float(cheapest["price"]) <= ALERT_BELOW_CAD
+    )
 
     run = {
         "checked_at": checked_at,
@@ -204,6 +225,8 @@ def main() -> int:
         "outbound_dates": list(OUTBOUND_DATES),
         "currency": CURRENCY,
         "source": "google_flights_fast_flights",
+        "alert_below_cad": ALERT_BELOW_CAD,
+        "alert": alert,
         "results": results,
         "cheapest": cheapest,
         "previous_cheapest": previous,
@@ -214,6 +237,41 @@ def main() -> int:
     LATEST_PATH.write_text(json.dumps(run, indent=2) + "\n")
     with HISTORY_PATH.open("a") as f:
         f.write(json.dumps(run) + "\n")
+
+    if alert and cheapest:
+        airlines = ", ".join(cheapest.get("airlines") or []) or "n/a"
+        alert_payload = {
+            "alert": True,
+            "price": cheapest["price"],
+            "currency": cheapest.get("currency", CURRENCY),
+            "outbound": cheapest["outbound"],
+            "return": cheapest["return"],
+            "airlines": airlines,
+            "threshold": ALERT_BELOW_CAD,
+            "checked_at": checked_at,
+            "title": (
+                f"Price alert: YVR→BCN {CURRENCY} {cheapest['price']:,.0f} "
+                f"(at/under {ALERT_BELOW_CAD:,.0f})"
+            ),
+            "body": (
+                f"Cheapest round-trip is **{CURRENCY} {cheapest['price']:,.2f}** "
+                f"(threshold {CURRENCY} {ALERT_BELOW_CAD:,.0f}).\n\n"
+                f"- Outbound: {cheapest['outbound']}\n"
+                f"- Return: {cheapest['return']}\n"
+                f"- Airlines: {airlines}\n"
+                f"- Checked: {checked_at}\n\n"
+                f"Confirm on [Google Flights](https://www.google.com/travel/flights) before booking."
+            ),
+        }
+        ALERT_PATH.write_text(json.dumps(alert_payload, indent=2) + "\n")
+    else:
+        ALERT_PATH.write_text(json.dumps({"alert": False}) + "\n")
+
+    write_github_output("alert", "true" if alert else "false")
+    if cheapest and cheapest.get("price") is not None:
+        write_github_output("price", f"{cheapest['price']:.2f}")
+    else:
+        write_github_output("price", "")
 
     summary = build_summary(run)
     SUMMARY_PATH.write_text(summary)

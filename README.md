@@ -28,6 +28,16 @@ Then: **Actions → Check flight prices → Run workflow**.
 
 No secrets to add.
 
+## Price alerts (≤ CAD 1100)
+
+When the cheapest round-trip is **at or under CAD 1,100**, the Action opens (or updates) a GitHub **Issue** labeled `price-alert`.
+
+To get emailed:
+1. Repo → **Watch** → **Custom** → enable **Issues** (or All Activity)
+2. Confirm GitHub email notifications are on: [github.com/settings/notifications](https://github.com/settings/notifications)
+
+No extra accounts or credit card needed.
+
 ## Important caveats
 
 - **July 2027 may show “no offers” for a while.** Airlines often open schedules ~10–11 months ahead. The daily job will start returning prices once Google has them.
