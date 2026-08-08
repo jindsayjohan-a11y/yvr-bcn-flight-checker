@@ -9,7 +9,7 @@ Daily (and on-demand) price checks for:
 | **Outbound** | 16, 17, or 18 July **2027** |
 | **Return** | 25 July **2027** |
 
-**Cost: $0.** Prices come from Google Flights via [`fast-flights`](https://pypi.org/project/fast-flights/). Optional Telegram alerts use a free bot (no credit card).
+**Cost: $0.** Prices come from Google Flights via [`fast-flights`](https://pypi.org/project/fast-flights/). Alerts email **bcw3bcw3@gmail.com** when fares hit the threshold.
 
 ## Stay at $0 on GitHub
 
@@ -17,29 +17,25 @@ Daily (and on-demand) price checks for:
 2. Or keep it private and stay under **2,000 free minutes/month** (daily checks use ~30).
 3. In GitHub: **Settings → Billing → Budgets** → set Actions budget to **$0** so nothing can ever charge.
 
-## One-time setup
-
-Repo is already live. To enable Telegram alerts, add two secrets (below).
-
 ## Price alerts (≤ CAD 1100)
 
 When the cheapest round-trip is **at or under CAD 1,100**:
 
-1. **Telegram** message (if secrets are set)
-2. GitHub **Issue** labeled `price-alert` (email if you Watch the repo)
+1. **Email** to `bcw3bcw3@gmail.com` (needs Gmail App Password secrets below)
+2. GitHub **Issue** labeled `price-alert` as backup
 
-### Telegram setup (free, ~2 minutes)
+### Enable email (free, no credit card)
 
-1. In Telegram, open [@BotFather](https://t.me/BotFather) → `/newbot` → follow prompts → copy the **bot token**
-2. Open your new bot and tap **Start** (send any message)
-3. In a browser, open (paste your token):
-   `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates`
-4. Find `"chat":{"id": 123456789` — that number is your **chat id**
-5. In the GitHub repo: **Settings → Secrets and variables → Actions → New repository secret**
-   - `TELEGRAM_BOT_TOKEN` = bot token
-   - `TELEGRAM_CHAT_ID` = chat id
+Gmail won’t let GitHub send mail with your normal password. Use an **App Password**:
 
-Optional email: repo → **Watch** → **Custom** → **Issues**.
+1. Sign into the Google account that will **send** the mail (can be `bcw3bcw3@gmail.com`)
+2. Turn on [2-Step Verification](https://myaccount.google.com/signinoptions/two-step-verification) if it isn’t already
+3. Create an [App Password](https://myaccount.google.com/apppasswords) → app “Mail” → copy the 16-character password
+4. Repo → **Settings → Secrets and variables → Actions → New repository secret**
+   - `GMAIL_USER` = that Gmail address (e.g. `bcw3bcw3@gmail.com`)
+   - `GMAIL_APP_PASSWORD` = the 16-character app password (no spaces)
+
+Alerts are sent **to** `bcw3bcw3@gmail.com` automatically.
 
 ## Important caveats
 

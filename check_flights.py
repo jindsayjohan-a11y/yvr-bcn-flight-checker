@@ -24,6 +24,7 @@ RETURN_DATE = "2027-07-25"
 ADULTS = 1
 CURRENCY = "CAD"
 ALERT_BELOW_CAD = 1100.0  # notify when cheapest round-trip is at/under this
+EMAIL_TO = "bcw3bcw3@gmail.com"
 PAUSE_SECONDS = 2  # be polite between date searches
 
 ROOT = Path(__file__).resolve().parent
@@ -139,7 +140,7 @@ def build_summary(run: dict) -> str:
         threshold = run.get("alert_below_cad", ALERT_BELOW_CAD)
         if run.get("alert"):
             lines.append(
-                f"- **ALERT:** at or under {CURRENCY} {threshold:,.0f} — GitHub Issue notification fired"
+                f"- **ALERT:** at or under {CURRENCY} {threshold:,.0f} — email + GitHub Issue notification"
             )
         else:
             lines.append(f"- Alert threshold: {CURRENCY} {threshold:,.0f} (not met)")
@@ -179,52 +180,51 @@ def write_github_output(name: str, value: str) -> None:
         f.write(f"{name}={value}\n")
 
 
-def send_telegram(text: str) -> bool:
-    """Send a Telegram message if TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID are set."""
-    import urllib.error
-    import urllib.parse
-    import urllib.request
+def send_email_alert(alert_payload: dict) -> bool:
+    """Email alert via Gmail SMTP if GMAIL_USER + GMAIL_APP_PASSWORD are set."""
+    import smtplib
+    from email.message import EmailMessage
 
-    token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
-    chat_id = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
-    if not token or not chat_id:
-        print("Telegram skipped (set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID to enable).")
+    user = os.environ.get("GMAIL_USER", "").strip()
+    password = os.environ.get("GMAIL_APP_PASSWORD", "").strip()
+    to_addr = os.environ.get("EMAIL_TO", EMAIL_TO).strip() or EMAIL_TO
+
+    if not user or not password:
+        print(
+            "Email skipped (set GMAIL_USER and GMAIL_APP_PASSWORD secrets to enable).",
+            file=sys.stderr,
+        )
         return False
 
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
-    payload = urllib.parse.urlencode(
-        {
-            "chat_id": chat_id,
-            "text": text,
-            "disable_web_page_preview": "true",
-        }
-    ).encode()
-    req = urllib.request.Request(url, data=payload, method="POST")
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            resp.read()
-        print("Telegram alert sent.")
-        return True
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode(errors="replace")
-        print(f"Telegram failed: HTTP {exc.code} {detail}", file=sys.stderr)
-        return False
-    except Exception as exc:  # noqa: BLE001
-        print(f"Telegram failed: {exc}", file=sys.stderr)
-        return False
-
-
-def telegram_text(alert_payload: dict) -> str:
-    return (
-        f"✈️ Price alert: YVR → BCN\n"
-        f"{alert_payload['currency']} {alert_payload['price']:,.2f} "
-        f"(at/under {alert_payload['threshold']:,.0f})\n\n"
+    subject = alert_payload["title"]
+    body = (
+        f"YVR → BCN price alert\n\n"
+        f"Cheapest round-trip: {alert_payload['currency']} {alert_payload['price']:,.2f}\n"
+        f"Threshold: {alert_payload['currency']} {alert_payload['threshold']:,.0f}\n"
         f"Outbound: {alert_payload['outbound']}\n"
         f"Return: {alert_payload['return']}\n"
         f"Airlines: {alert_payload['airlines']}\n"
         f"Checked: {alert_payload['checked_at']}\n\n"
-        f"Confirm on Google Flights before booking."
+        f"Confirm on Google Flights before booking:\n"
+        f"https://www.google.com/travel/flights\n"
     )
+
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = user
+    msg["To"] = to_addr
+    msg.set_content(body)
+
+    try:
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=30) as smtp:
+            smtp.starttls()
+            smtp.login(user, password)
+            smtp.send_message(msg)
+        print(f"Email alert sent to {to_addr}")
+        return True
+    except Exception as exc:  # noqa: BLE001
+        print(f"Email failed: {exc}", file=sys.stderr)
+        return False
 
 
 def main() -> int:
@@ -312,7 +312,7 @@ def main() -> int:
             ),
         }
         ALERT_PATH.write_text(json.dumps(alert_payload, indent=2) + "\n")
-        send_telegram(telegram_text(alert_payload))
+        send_email_alert(alert_payload)
     else:
         ALERT_PATH.write_text(json.dumps({"alert": False}) + "\n")
 
