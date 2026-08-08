@@ -179,6 +179,54 @@ def write_github_output(name: str, value: str) -> None:
         f.write(f"{name}={value}\n")
 
 
+def send_telegram(text: str) -> bool:
+    """Send a Telegram message if TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID are set."""
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+    if not token or not chat_id:
+        print("Telegram skipped (set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID to enable).")
+        return False
+
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = urllib.parse.urlencode(
+        {
+            "chat_id": chat_id,
+            "text": text,
+            "disable_web_page_preview": "true",
+        }
+    ).encode()
+    req = urllib.request.Request(url, data=payload, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            resp.read()
+        print("Telegram alert sent.")
+        return True
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode(errors="replace")
+        print(f"Telegram failed: HTTP {exc.code} {detail}", file=sys.stderr)
+        return False
+    except Exception as exc:  # noqa: BLE001
+        print(f"Telegram failed: {exc}", file=sys.stderr)
+        return False
+
+
+def telegram_text(alert_payload: dict) -> str:
+    return (
+        f"✈️ Price alert: YVR → BCN\n"
+        f"{alert_payload['currency']} {alert_payload['price']:,.2f} "
+        f"(at/under {alert_payload['threshold']:,.0f})\n\n"
+        f"Outbound: {alert_payload['outbound']}\n"
+        f"Return: {alert_payload['return']}\n"
+        f"Airlines: {alert_payload['airlines']}\n"
+        f"Checked: {alert_payload['checked_at']}\n\n"
+        f"Confirm on Google Flights before booking."
+    )
+
+
 def main() -> int:
     checked_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     results: list[dict] = []
@@ -264,6 +312,7 @@ def main() -> int:
             ),
         }
         ALERT_PATH.write_text(json.dumps(alert_payload, indent=2) + "\n")
+        send_telegram(telegram_text(alert_payload))
     else:
         ALERT_PATH.write_text(json.dumps({"alert": False}) + "\n")
 

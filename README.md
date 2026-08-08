@@ -9,7 +9,7 @@ Daily (and on-demand) price checks for:
 | **Outbound** | 16, 17, or 18 July **2027** |
 | **Return** | 25 July **2027** |
 
-**Cost: $0.** No API keys, no accounts, no credit card. Prices come from Google Flights via the open-source [`fast-flights`](https://pypi.org/project/fast-flights/) library.
+**Cost: $0.** Prices come from Google Flights via [`fast-flights`](https://pypi.org/project/fast-flights/). Optional Telegram alerts use a free bot (no credit card).
 
 ## Stay at $0 on GitHub
 
@@ -19,24 +19,27 @@ Daily (and on-demand) price checks for:
 
 ## One-time setup
 
-```bash
-# from this folder
-gh repo create yvr-bcn-flight-checker --public --source=. --remote=origin --push
-```
-
-Then: **Actions → Check flight prices → Run workflow**.
-
-No secrets to add.
+Repo is already live. To enable Telegram alerts, add two secrets (below).
 
 ## Price alerts (≤ CAD 1100)
 
-When the cheapest round-trip is **at or under CAD 1,100**, the Action opens (or updates) a GitHub **Issue** labeled `price-alert`.
+When the cheapest round-trip is **at or under CAD 1,100**:
 
-To get emailed:
-1. Repo → **Watch** → **Custom** → enable **Issues** (or All Activity)
-2. Confirm GitHub email notifications are on: [github.com/settings/notifications](https://github.com/settings/notifications)
+1. **Telegram** message (if secrets are set)
+2. GitHub **Issue** labeled `price-alert` (email if you Watch the repo)
 
-No extra accounts or credit card needed.
+### Telegram setup (free, ~2 minutes)
+
+1. In Telegram, open [@BotFather](https://t.me/BotFather) → `/newbot` → follow prompts → copy the **bot token**
+2. Open your new bot and tap **Start** (send any message)
+3. In a browser, open (paste your token):
+   `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates`
+4. Find `"chat":{"id": 123456789` — that number is your **chat id**
+5. In the GitHub repo: **Settings → Secrets and variables → Actions → New repository secret**
+   - `TELEGRAM_BOT_TOKEN` = bot token
+   - `TELEGRAM_CHAT_ID` = chat id
+
+Optional email: repo → **Watch** → **Custom** → **Issues**.
 
 ## Important caveats
 
