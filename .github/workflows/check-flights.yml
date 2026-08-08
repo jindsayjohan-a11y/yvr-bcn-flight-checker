@@ -1,0 +1,50 @@
+name: Check flight prices
+
+on:
+  schedule:
+    # Daily at 15:00 UTC (~8am Pacific)
+    - cron: "0 15 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check YVR → BCN prices
+        run: python check_flights.py
+
+      - name: Write job summary
+        if: always()
+        run: |
+          if [ -f data/summary.md ]; then
+            cat data/summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No summary produced (check logs)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload price artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flight-prices-${{ github.run_id }}
+          path: |
+            data/latest.json
+            data/summary.md
+            data/history.jsonl
+          if-no-files-found: ignore
+          retention-days: 90
