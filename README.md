@@ -42,7 +42,7 @@ Alerts are sent **to** `bcw3bcw3@gmail.com` automatically.
 
 ### Biweekly summary
 
-On the **1st and 15th** of each month, you also get an email listing the **lowest price from each day** over the past 14 days (from saved check history). You can trigger it anytime: **Actions → Biweekly price summary → Run workflow**.
+On the **1st and 15th** of each month, you also get an email listing the **lowest price from each day** (economy, premium economy, and business) over the past 14 days. You can trigger it anytime: **Actions → Biweekly price summary → Run workflow**.
 
 ## Important caveats
 
@@ -63,7 +63,7 @@ Your home IP is less likely to be blocked than a cloud datacenter.
 
 ## Schedule
 
-Default: **once per day** (~8am Pacific). That is plenty for fare watching and stays safely free.
+Default: **every 5 minutes** (GitHub’s shortest cron interval). Runs can be delayed when Actions is busy. Google may temporarily block cloud IPs if checks are too aggressive — if that happens, switch back to hourly/daily.
 
 ## Files
 

@@ -2,8 +2,8 @@ name: Check flight prices
 
 on:
   schedule:
-    # Daily at 15:00 UTC (~8am Pacific)
-    - cron: "0 15 * * *"
+    # As often as GitHub allows (~every 5 minutes; runs can be delayed under load)
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 permissions:
