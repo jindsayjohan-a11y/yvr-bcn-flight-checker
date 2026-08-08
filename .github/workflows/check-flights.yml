@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   issues: write
 
 jobs:
@@ -34,6 +34,19 @@ jobs:
           EMAIL_TO: bcw3bcw3@gmail.com
         run: python check_flights.py
 
+      - name: Persist price history
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/history.jsonl
+          if git diff --staged --quiet; then
+            echo "No history changes to commit"
+          else
+            git commit -m "chore: update flight price history"
+            git push
+          fi
+
       - name: Write job summary
         if: always()
         run: |
@@ -56,7 +69,6 @@ jobs:
             }
 
             const label = 'price-alert';
-            // Ensure label exists (ignore if already there)
             try {
               await github.rest.issues.createLabel({
                 owner: context.repo.owner,

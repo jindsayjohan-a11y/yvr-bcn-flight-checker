@@ -1,0 +1,36 @@
+name: Biweekly price summary
+
+on:
+  schedule:
+    # 1st and 15th of each month at 16:00 UTC (~9am Pacific)
+    - cron: "0 16 1,15 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  summarize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Email biweekly summary
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          EMAIL_TO: bcw3bcw3@gmail.com
+        run: python send_biweekly_summary.py
+
+      - name: Write job summary
+        if: always()
+        run: |
+          if [ -f data/biweekly_summary.txt ]; then
+            cat data/biweekly_summary.txt >> "$GITHUB_STEP_SUMMARY"
+          fi

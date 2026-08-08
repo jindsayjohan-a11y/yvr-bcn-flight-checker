@@ -37,6 +37,10 @@ Gmail won’t let GitHub send mail with your normal password. Use an **App Passw
 
 Alerts are sent **to** `bcw3bcw3@gmail.com` automatically.
 
+### Biweekly summary
+
+On the **1st and 15th** of each month, you also get an email listing the **lowest price from each day** over the past 14 days (from saved check history). You can trigger it anytime: **Actions → Biweekly price summary → Run workflow**.
+
 ## Important caveats
 
 - **July 2027 may show “no offers” for a while.** Airlines often open schedules ~10–11 months ahead. The daily job will start returning prices once Google has them.

@@ -17,6 +17,8 @@ from pathlib import Path
 from fast_flights import FlightQuery, Passengers, create_filter, get_flights
 from fast_flights.exceptions import FlightsNotFound
 
+from mailer import send_email
+
 ORIGIN = "YVR"
 DESTINATION = "BCN"
 OUTBOUND_DATES = ("2027-07-16", "2027-07-17", "2027-07-18")
@@ -181,22 +183,6 @@ def write_github_output(name: str, value: str) -> None:
 
 
 def send_email_alert(alert_payload: dict) -> bool:
-    """Email alert via Gmail SMTP if GMAIL_USER + GMAIL_APP_PASSWORD are set."""
-    import smtplib
-    from email.message import EmailMessage
-
-    user = os.environ.get("GMAIL_USER", "").strip()
-    password = os.environ.get("GMAIL_APP_PASSWORD", "").strip()
-    to_addr = os.environ.get("EMAIL_TO", EMAIL_TO).strip() or EMAIL_TO
-
-    if not user or not password:
-        print(
-            "Email skipped (set GMAIL_USER and GMAIL_APP_PASSWORD secrets to enable).",
-            file=sys.stderr,
-        )
-        return False
-
-    subject = alert_payload["title"]
     body = (
         f"YVR → BCN price alert\n\n"
         f"Cheapest round-trip: {alert_payload['currency']} {alert_payload['price']:,.2f}\n"
@@ -208,23 +194,7 @@ def send_email_alert(alert_payload: dict) -> bool:
         f"Confirm on Google Flights before booking:\n"
         f"https://www.google.com/travel/flights\n"
     )
-
-    msg = EmailMessage()
-    msg["Subject"] = subject
-    msg["From"] = user
-    msg["To"] = to_addr
-    msg.set_content(body)
-
-    try:
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=30) as smtp:
-            smtp.starttls()
-            smtp.login(user, password)
-            smtp.send_message(msg)
-        print(f"Email alert sent to {to_addr}")
-        return True
-    except Exception as exc:  # noqa: BLE001
-        print(f"Email failed: {exc}", file=sys.stderr)
-        return False
+    return send_email(alert_payload["title"], body, to_addr=EMAIL_TO)
 
 
 def main() -> int:
