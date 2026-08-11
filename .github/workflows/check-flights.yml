@@ -34,7 +34,7 @@ jobs:
           EMAIL_TO: bcw3bcw3@gmail.com
         run: python check_flights.py
 
-      - name: Check Barcelona hotel prices (pre/post cruise only)
+      - name: Check Barcelona hotel prices (landing + post-cruise)
         id: hotels
         env:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}

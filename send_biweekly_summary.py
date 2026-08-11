@@ -21,8 +21,10 @@ CABINS = (
     ("business", "Business"),
 )
 HOTEL_STAY_IDS = (
-    ("pre_cruise", "Pre-cruise hotel (Jul 14→15)"),
-    ("post_cruise", "Post-cruise hotel (Jul 24→25)"),
+    ("landing-2027-07-16", "Landing hotel (flight Jul 16→17)"),
+    ("landing-2027-07-17", "Landing hotel (flight Jul 17→18)"),
+    ("landing-2027-07-18", "Landing hotel (flight Jul 18→19)"),
+    ("post-cruise", "Post-cruise hotel (Jul 24→25)"),
 )
 
 
@@ -144,15 +146,17 @@ def load_daily_hotel_lows(path: Path) -> dict[str, dict[date, dict]]:
                 if sid not in by_stay:
                     continue
                 cheapest = stay.get("cheapest") or {}
+                price = cheapest.get("price", stay.get("price"))
+                name = cheapest.get("name", stay.get("name"))
                 bucket = by_stay[sid]
-                if not stay.get("found") or cheapest.get("price") is None:
+                if not stay.get("found") or price is None:
                     if day not in bucket:
                         bucket[day] = {"price": None}
                     continue
-                price = float(cheapest["price"])
+                price = float(price)
                 row = {
                     "price": price,
-                    "hotel": cheapest.get("name"),
+                    "hotel": name,
                     "check_in": stay.get("check_in"),
                     "check_out": stay.get("check_out"),
                 }
@@ -199,10 +203,10 @@ def build_summary(
         "YVR → BCN + Barcelona hotels biweekly summary",
         f"Period: {start.isoformat()} → {end.isoformat()} (UTC)",
         "Flights: outbound Jul 16–18 2027, return Jul 25 2027",
-        "Hotels: pre Jul 14→15 + post Jul 24→25 only (cruise Jul 15–24 on ship — excluded)",
+        "Hotels: landing nights (Jul 16/17/18) + post Jul 24→25 (cruise Jul 15–24 on ship — excluded)",
         "",
         "Flight alerts: Economy ≤ 1,100 · Premium economy ≤ 1,600 · Business ≤ 2,500",
-        "Hotel alert: cheapest 1-night total ≤ 300 CAD",
+        "Hotel alert: ≤ 200 CAD / night (3★+)",
         "",
         "=== FLIGHTS ===",
         "",
@@ -211,7 +215,7 @@ def build_summary(
         section, _ = section_for_cabin(label, by_cabin.get(cabin, {}), start, days)
         lines.extend(section)
 
-    lines.extend(["=== BARCELONA HOTELS (pre/post cruise only) ===", ""])
+    lines.extend(["=== BARCELONA HOTELS (landing + post-cruise) ===", ""])
     for sid, label in HOTEL_STAY_IDS:
         lines.extend(section_for_hotels(label, by_hotel.get(sid, {}), start, days))
 

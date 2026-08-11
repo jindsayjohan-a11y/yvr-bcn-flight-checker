@@ -13,3 +13,7 @@ data/biweekly_summary.txt
 data/hotel_latest.json
 data/hotel_summary.md
 data/hotel_alert.json
+data/hotel_history.jsonl
+data/hotel_latest.json
+data/hotel_summary.md
+data/hotel_alert.json

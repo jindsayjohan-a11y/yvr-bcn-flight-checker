@@ -17,16 +17,22 @@ Free price tracking for your July 2027 Barcelona trip. Alerts email **bcw3bcw3@g
 | Premium economy | **CAD 1,600** |
 | Business | **CAD 2,500** |
 
-## Hotels (Barcelona — outside the cruise only)
+## Hotels (Barcelona — tied to flight landing + post-cruise)
 
-Cruise is **July 15–24** (nights on the ship). Those dates are **not** tracked for hotels.
+Cruise **Jul 15–24** = nights on the ship (**not** tracked).
 
-| Stay | Check-in | Check-out | Why |
-|------|----------|-----------|-----|
-| Pre-cruise | **2027-07-14** | **2027-07-15** | Night before embarkation |
-| Post-cruise | **2027-07-24** | **2027-07-25** | Disembark → overnight before July 25 flight home |
+Hotels tracked for nights you need a room:
 
-Hotel alert: cheapest 1-night total **≤ CAD 300** (2 adults, Google Hotels via [`stays`](https://pypi.org/project/stays/)).
+| Stay | Check-in → out | Why |
+|------|----------------|-----|
+| Landing (flight Jul 16) | **Jul 16→17** | Hotel the night you land |
+| Landing (flight Jul 17) | **Jul 17→18** | Hotel the night you land |
+| Landing (flight Jul 18) | **Jul 18→19** | Hotel the night you land |
+| Post-cruise | **Jul 24→25** | After disembarkation, before Jul 25 flight home |
+
+- Source: Google Hotels via [`stays`](https://pypi.org/project/stays/)
+- Filter: **3★+**, 1 adult, **CAD**
+- Email alert when cheapest is **≤ CAD 200 / night**
 
 **Cost: $0.** Flights use [`fast-flights`](https://pypi.org/project/fast-flights/); hotels use `stays`. No credit card.
 
@@ -71,7 +77,7 @@ python check_hotels.py
 | Path | Role |
 |------|------|
 | `check_flights.py` | Flight fares by cabin |
-| `check_hotels.py` | Barcelona hotels pre/post cruise only |
+| `check_hotels.py` | Barcelona hotels for landing nights + post-cruise |
 | `send_biweekly_summary.py` | 14-day email summary |
 | `.github/workflows/check-flights.yml` | Scheduled checker |
 | `data/history.jsonl` | Flight history |
