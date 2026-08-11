@@ -17,19 +17,14 @@ Free price tracking for your July 2027 Barcelona trip. Alerts email **bcw3bcw3@g
 | Premium economy | **CAD 1,600** |
 | Business | **CAD 2,500** |
 
-## Hotels (Barcelona — tied to flight landing + post-cruise)
+## Hotels (Barcelona — outside the cruise only)
 
 Cruise **Jul 15–24** = nights on the ship (**not** tracked).
 
-Hotels tracked for nights you need a room:
-
 | Stay | Check-in → out | Why |
 |------|----------------|-----|
-| Land Jul 9 | **Jul 9→15** | Hotel until cruise embark |
-| Land Jul 10 | **Jul 10→15** | Hotel until cruise embark |
-| Land Jul 11 | **Jul 11→15** | Hotel until cruise embark |
-| Land Jul 12 | **Jul 12→15** | Hotel until cruise embark |
-| Post-cruise | **Jul 24→25** | After ship, before Jul 25 flight |
+| Pre-cruise | **Jul 14→15** | Night before embarkation |
+| Post-cruise | **Jul 24→25** | After ship, before Jul 25 flight home |
 
 - Source: Google Hotels via [`stays`](https://pypi.org/project/stays/)
 - Filter: **4★+**, within **2 km of Plaça de Catalunya** (Gothic / Ramblas / central Eixample)

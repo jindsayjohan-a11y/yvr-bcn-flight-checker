@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Check Barcelona hotel prices for flight-landing and post-cruise nights.
+"""Check Barcelona hotel prices for pre/post cruise nights only.
 
 Cruise is July 15–24 (ship nights — not tracked).
-Hotels needed when you land (tied to YVR→BCN flight dates) and the night
-after disembarkation before the July 25 return flight.
+Tracks only:
+  - Pre-embark: 2027-07-14 → 2027-07-15
+  - Post-disembark: 2027-07-24 → 2027-07-25 (before return flight)
 """
 
 from __future__ import annotations
@@ -45,11 +46,9 @@ MIN_STARS = 4
 PAUSE_SECONDS = 2
 TOP_N = 5
 
-# Match flight landing options: hotel from landing until cruise embark Jul 15
-LANDING_DATES = ("2027-07-09", "2027-07-10", "2027-07-11", "2027-07-12")
-EMBARK_DATE = "2027-07-15"
-# After cruise (ends July 24) before return flight July 25
-POST_CRUISE = ("2027-07-24", "2027-07-25")
+# Outside the cruise only (ship nights Jul 15–24 excluded)
+PRE_CRUISE = ("2027-07-14", "2027-07-15")  # night before embarkation
+POST_CRUISE = ("2027-07-24", "2027-07-25")  # after disembark, before Jul 25 flight
 
 ROOT = Path(__file__).resolve().parent
 DATA_DIR = ROOT / "data"
@@ -61,33 +60,32 @@ ALERT_PATH = DATA_DIR / "hotel_alert.json"
 
 def stay_windows() -> list[dict]:
     windows = []
-    embark = date.fromisoformat(EMBARK_DATE)
-    for landing in LANDING_DATES:
-        check_in = date.fromisoformat(landing)
+    for stay_id, label, kind, pair in (
+        (
+            "pre-cruise",
+            "Pre-cruise night (Jul 14→15)",
+            "pre_cruise",
+            PRE_CRUISE,
+        ),
+        (
+            "post-cruise",
+            "Post-cruise night (Jul 24→25)",
+            "post_cruise",
+            POST_CRUISE,
+        ),
+    ):
+        check_in = date.fromisoformat(pair[0])
+        check_out = date.fromisoformat(pair[1])
         windows.append(
             {
-                "id": f"landing-{landing}",
-                "label": f"Pre-cruise hotel (land {landing} → embark {EMBARK_DATE})",
-                "kind": "landing",
-                "flight_date": landing,
-                "check_in": check_in.isoformat(),
-                "check_out": embark.isoformat(),
-                "nights": (embark - check_in).days,
+                "id": stay_id,
+                "label": label,
+                "kind": kind,
+                "check_in": pair[0],
+                "check_out": pair[1],
+                "nights": (check_out - check_in).days,
             }
         )
-    post_in = date.fromisoformat(POST_CRUISE[0])
-    post_out = date.fromisoformat(POST_CRUISE[1])
-    windows.append(
-        {
-            "id": "post-cruise",
-            "label": "Post-cruise night (Jul 24→25)",
-            "kind": "post_cruise",
-            "flight_date": None,
-            "check_in": POST_CRUISE[0],
-            "check_out": POST_CRUISE[1],
-            "nights": (post_out - post_in).days,
-        }
-    )
     return windows
 
 
@@ -197,8 +195,8 @@ def build_summary(run: dict) -> str:
         f"**{MAX_KM_FROM_CENTER} km** of Plaça de Catalunya — Gothic / Ramblas / central Eixample)",
         f"- Guests: {ADULTS} adult(s), {MIN_STARS}★+",
         f"- Alert: ≤ **{CURRENCY} {HOTEL_ALERT_BELOW_CAD:,.0f}** / night",
-        "- Cruise Jul 15–24 = ship (not tracked)",
-        "- Tracked: land Jul 9–12 → embark Jul 15 + post-cruise Jul 24→25",
+        "- Cruise Jul 15–24 = ship (**not** tracked)",
+        "- Tracked: pre-cruise **Jul 14→15** + post-cruise **Jul 24→25** only",
         "",
         "| Stay | Total | /night | Hotel | km | Stars |",
         "|------|------:|-------:|-------|---:|------:|",

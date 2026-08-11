@@ -21,10 +21,7 @@ CABINS = (
     ("business", "Business"),
 )
 HOTEL_STAY_IDS = (
-    ("landing-2027-07-09", "Pre-cruise hotel (land Jul 9→15)"),
-    ("landing-2027-07-10", "Pre-cruise hotel (land Jul 10→15)"),
-    ("landing-2027-07-11", "Pre-cruise hotel (land Jul 11→15)"),
-    ("landing-2027-07-12", "Pre-cruise hotel (land Jul 12→15)"),
+    ("pre-cruise", "Pre-cruise hotel (Jul 14→15)"),
     ("post-cruise", "Post-cruise hotel (Jul 24→25)"),
 )
 
@@ -204,7 +201,7 @@ def build_summary(
         "YVR → BCN + Barcelona hotels biweekly summary",
         f"Period: {start.isoformat()} → {end.isoformat()} (UTC)",
         "Flights: outbound Jul 9–12 2027, return Jul 25 2027",
-        "Hotels: land Jul 9–12 → embark Jul 15 + post Jul 24→25 (cruise Jul 15–24 on ship — excluded)",
+        "Hotels: pre Jul 14→15 + post Jul 24→25 only (cruise Jul 15–24 on ship — excluded)",
         "",
         "Flight alerts: Economy ≤ 1,100 · Premium economy ≤ 1,600 · Business ≤ 2,500",
         "Hotel alert: ≤ 200 CAD / night (4★+)",
@@ -216,7 +213,7 @@ def build_summary(
         section, _ = section_for_cabin(label, by_cabin.get(cabin, {}), start, days)
         lines.extend(section)
 
-    lines.extend(["=== BARCELONA HOTELS (landing + post-cruise) ===", ""])
+    lines.extend(["=== BARCELONA HOTELS (pre/post cruise only) ===", ""])
     for sid, label in HOTEL_STAY_IDS:
         lines.extend(section_for_hotels(label, by_hotel.get(sid, {}), start, days))
 
