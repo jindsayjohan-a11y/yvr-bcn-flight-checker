@@ -12,7 +12,7 @@ import json
 import os
 import sys
 import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from stays import (
@@ -38,8 +38,9 @@ MIN_STARS = 3
 PAUSE_SECONDS = 2
 TOP_N = 5
 
-# Match flight landing options: need a hotel that night → checkout next day
-LANDING_DATES = ("2027-07-16", "2027-07-17", "2027-07-18")
+# Match flight landing options: hotel from landing until cruise embark Jul 15
+LANDING_DATES = ("2027-07-09", "2027-07-10", "2027-07-11", "2027-07-12")
+EMBARK_DATE = "2027-07-15"
 # After cruise (ends July 24) before return flight July 25
 POST_CRUISE = ("2027-07-24", "2027-07-25")
 
@@ -53,19 +54,22 @@ ALERT_PATH = DATA_DIR / "hotel_alert.json"
 
 def stay_windows() -> list[dict]:
     windows = []
+    embark = date.fromisoformat(EMBARK_DATE)
     for landing in LANDING_DATES:
         check_in = date.fromisoformat(landing)
-        check_out = check_in + timedelta(days=1)
         windows.append(
             {
                 "id": f"landing-{landing}",
-                "label": f"Landing night ({landing})",
+                "label": f"Pre-cruise hotel (land {landing} → embark {EMBARK_DATE})",
                 "kind": "landing",
                 "flight_date": landing,
                 "check_in": check_in.isoformat(),
-                "check_out": check_out.isoformat(),
+                "check_out": embark.isoformat(),
+                "nights": (embark - check_in).days,
             }
         )
+    post_in = date.fromisoformat(POST_CRUISE[0])
+    post_out = date.fromisoformat(POST_CRUISE[1])
     windows.append(
         {
             "id": "post-cruise",
@@ -74,12 +78,13 @@ def stay_windows() -> list[dict]:
             "flight_date": None,
             "check_in": POST_CRUISE[0],
             "check_out": POST_CRUISE[1],
+            "nights": (post_out - post_in).days,
         }
     )
     return windows
 
 
-def search_stay(check_in: str, check_out: str) -> dict:
+def search_stay(check_in: str, check_out: str, nights: int) -> dict:
     filters = HotelSearchFilters(
         location=Location(query=CITY),
         dates=DateRange(
@@ -92,29 +97,36 @@ def search_stay(check_in: str, check_out: str) -> dict:
         sort_by=SortBy.LOWEST_PRICE,
         hotel_class=list(range(MIN_STARS, 6)),
     )
+    empty = {
+        "found": False,
+        "price": None,
+        "price_per_night": None,
+        "nights": nights,
+        "currency": CURRENCY,
+        "name": None,
+        "stars": None,
+        "rating": None,
+        "top": [],
+        "note": None,
+    }
     try:
         results = SearchHotels().search(filters)
     except Exception as exc:  # noqa: BLE001
-        return {
-            "found": False,
-            "price": None,
-            "currency": CURRENCY,
-            "name": None,
-            "stars": None,
-            "rating": None,
-            "top": [],
-            "note": f"{type(exc).__name__}: {exc}",
-        }
+        empty["note"] = f"{type(exc).__name__}: {exc}"
+        return empty
 
     priced = []
     for h in results or []:
         price = getattr(h, "display_price", None)
         if price is None:
             continue
+        total = float(price)
+        per_night = total / nights if nights else total
         priced.append(
             {
                 "name": getattr(h, "name", None),
-                "price": float(price),
+                "price": total,
+                "price_per_night": per_night,
                 "currency": getattr(h, "currency", None) or CURRENCY,
                 "stars": getattr(h, "star_class", None),
                 "rating": getattr(h, "overall_rating", None),
@@ -123,22 +135,16 @@ def search_stay(check_in: str, check_out: str) -> dict:
         )
 
     if not priced:
-        return {
-            "found": False,
-            "price": None,
-            "currency": CURRENCY,
-            "name": None,
-            "stars": None,
-            "rating": None,
-            "top": [],
-            "note": "No priced hotels (dates may be too far out, or blocked)",
-        }
+        empty["note"] = "No priced hotels (dates may be too far out, or blocked)"
+        return empty
 
-    priced.sort(key=lambda x: x["price"])
+    priced.sort(key=lambda x: x["price_per_night"])
     best = priced[0]
     return {
         "found": True,
         "price": best["price"],
+        "price_per_night": best["price_per_night"],
+        "nights": nights,
         "currency": best["currency"],
         "name": best["name"],
         "stars": best["stars"],
@@ -164,19 +170,21 @@ def build_summary(run: dict) -> str:
         f"- Guests: {ADULTS} adult(s), {MIN_STARS}★+",
         f"- Alert: ≤ **{CURRENCY} {HOTEL_ALERT_BELOW_CAD:,.0f}** / night",
         "- Cruise Jul 15–24 = ship (not tracked)",
-        "- Tracked: landing nights (flight dates) + post-cruise Jul 24→25",
+        "- Tracked: land Jul 9–12 → embark Jul 15 + post-cruise Jul 24→25",
         "",
-        "| Stay | Cheapest | Hotel | Stars |",
-        "|------|--------:|-------|------:|",
+        "| Stay | Total | /night | Hotel | Stars |",
+        "|------|------:|-------:|-------|------:|",
     ]
     for s in run["stays"]:
         if not s.get("found"):
             note = (s.get("note") or "no offers")[:40]
-            lines.append(f"| {s['label']} | — | {note} | — |")
+            lines.append(f"| {s['label']} | — | — | {note} | — |")
             continue
-        name = (s.get("name") or "—")[:40]
+        name = (s.get("name") or "—")[:36]
         lines.append(
-            f"| {s['label']} | {CURRENCY} {s['price']:,.0f} | {name} | {s.get('stars') or '—'} |"
+            f"| {s['label']} | {CURRENCY} {s['price']:,.0f} | "
+            f"{CURRENCY} {s.get('price_per_night', s['price']):,.0f} | "
+            f"{name} | {s.get('stars') or '—'} |"
         )
     lines.append("")
     triggered = run.get("triggered_alerts") or []
@@ -185,14 +193,18 @@ def build_summary(run: dict) -> str:
         lines.append("")
         for a in triggered:
             lines.append(
-                f"- {a['label']}: {CURRENCY} {a['price']:,.0f} — {a['name']}"
+                f"- {a['label']}: {CURRENCY} {a['price_per_night']:,.0f}/night "
+                f"(total {CURRENCY} {a['price']:,.0f}) — {a['name']}"
             )
         lines.append("")
     return "\n".join(lines)
 
 
 def build_alert_payload(triggered: list[dict], checked_at: str) -> dict:
-    titles = [f"{a['label']} {CURRENCY} {a['price']:,.0f}" for a in triggered]
+    titles = [
+        f"{a['label'].split('(')[0].strip()} {CURRENCY} {a['price_per_night']:,.0f}/n"
+        for a in triggered
+    ]
     email_lines = [
         "Barcelona hotel price alert",
         "",
@@ -208,7 +220,9 @@ def build_alert_payload(triggered: list[dict], checked_at: str) -> dict:
     for a in triggered:
         email_lines.extend(
             [
-                f"{a['label']}: {CURRENCY} {a['price']:,.2f}",
+                f"{a['label']}:",
+                f"  {CURRENCY} {a['price_per_night']:,.2f}/night "
+                f"(total {CURRENCY} {a['price']:,.2f} for {a['nights']} night(s))",
                 f"  Hotel: {a['name']}",
                 f"  Stars: {a.get('stars') or 'n/a'}",
                 f"  Check-in {a['check_in']} → out {a['check_out']}",
@@ -218,7 +232,8 @@ def build_alert_payload(triggered: list[dict], checked_at: str) -> dict:
         md_lines.extend(
             [
                 f"### {a['label']}",
-                f"**{CURRENCY} {a['price']:,.2f}** — {a['name']}",
+                f"**{CURRENCY} {a['price_per_night']:,.2f}/night** "
+                f"(total {CURRENCY} {a['price']:,.2f}, {a['nights']} night(s)) — {a['name']}",
                 f"- Check-in {a['check_in']} → out {a['check_out']}",
                 f"- Stars: {a.get('stars') or 'n/a'}",
                 "",
@@ -244,21 +259,25 @@ def main() -> int:
     for i, window in enumerate(stay_windows()):
         if i:
             time.sleep(PAUSE_SECONDS)
-        result = search_stay(window["check_in"], window["check_out"])
+        nights = int(window.get("nights") or 1)
+        result = search_stay(window["check_in"], window["check_out"], nights)
         row = {**window, **result}
         stays_out.append(row)
-        status = (
-            f"{CURRENCY} {result['price']:,.0f} — {result.get('name')}"
-            if result.get("found")
-            else (result.get("note") or "no offers")
-        )
+        if result.get("found"):
+            status = (
+                f"{CURRENCY} {result['price_per_night']:,.0f}/n "
+                f"(total {CURRENCY} {result['price']:,.0f}) — {result.get('name')}"
+            )
+        else:
+            status = result.get("note") or "no offers"
         print(f"OK  {window['label']}: {status}")
         if result.get("note") and not result.get("found"):
             errors += 1
+        per_night = result.get("price_per_night")
         if (
             result.get("found")
-            and result.get("price") is not None
-            and float(result["price"]) <= HOTEL_ALERT_BELOW_CAD
+            and per_night is not None
+            and float(per_night) <= HOTEL_ALERT_BELOW_CAD
         ):
             triggered.append(
                 {
@@ -266,7 +285,9 @@ def main() -> int:
                     "kind": window["kind"],
                     "check_in": window["check_in"],
                     "check_out": window["check_out"],
+                    "nights": nights,
                     "price": result["price"],
+                    "price_per_night": per_night,
                     "name": result.get("name"),
                     "stars": result.get("stars"),
                     "threshold": HOTEL_ALERT_BELOW_CAD,
@@ -284,8 +305,12 @@ def main() -> int:
         "alert": bool(triggered),
         "triggered_alerts": triggered,
         "cheapest": min(
-            (s for s in stays_out if s.get("found") and s.get("price") is not None),
-            key=lambda s: s["price"],
+            (
+                s
+                for s in stays_out
+                if s.get("found") and s.get("price_per_night") is not None
+            ),
+            key=lambda s: s["price_per_night"],
             default=None,
         ),
     }

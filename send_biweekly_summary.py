@@ -21,9 +21,10 @@ CABINS = (
     ("business", "Business"),
 )
 HOTEL_STAY_IDS = (
-    ("landing-2027-07-16", "Landing hotel (flight Jul 16→17)"),
-    ("landing-2027-07-17", "Landing hotel (flight Jul 17→18)"),
-    ("landing-2027-07-18", "Landing hotel (flight Jul 18→19)"),
+    ("landing-2027-07-09", "Pre-cruise hotel (land Jul 9→15)"),
+    ("landing-2027-07-10", "Pre-cruise hotel (land Jul 10→15)"),
+    ("landing-2027-07-11", "Pre-cruise hotel (land Jul 11→15)"),
+    ("landing-2027-07-12", "Pre-cruise hotel (land Jul 12→15)"),
     ("post-cruise", "Post-cruise hotel (Jul 24→25)"),
 )
 
@@ -202,8 +203,8 @@ def build_summary(
     lines = [
         "YVR → BCN + Barcelona hotels biweekly summary",
         f"Period: {start.isoformat()} → {end.isoformat()} (UTC)",
-        "Flights: outbound Jul 16–18 2027, return Jul 25 2027",
-        "Hotels: landing nights (Jul 16/17/18) + post Jul 24→25 (cruise Jul 15–24 on ship — excluded)",
+        "Flights: outbound Jul 9–12 2027, return Jul 25 2027",
+        "Hotels: land Jul 9–12 → embark Jul 15 + post Jul 24→25 (cruise Jul 15–24 on ship — excluded)",
         "",
         "Flight alerts: Economy ≤ 1,100 · Premium economy ≤ 1,600 · Business ≤ 2,500",
         "Hotel alert: ≤ 200 CAD / night (3★+)",

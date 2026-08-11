@@ -8,8 +8,8 @@ Free price tracking for your July 2027 Barcelona trip. Alerts email **bcw3bcw3@g
 |---|---|
 | **From** | Vancouver (YVR) |
 | **To** | Barcelona (BCN) |
-| **Outbound** | 16, 17, or 18 July **2027** |
-| **Return** | 25 July **2027** |
+| **Outbound** | **9, 10, 11, or 12 July 2027** |
+| **Return** | **25 July 2027** |
 
 | Cabin | Alert at or under |
 |-------|-------------------|
@@ -25,10 +25,11 @@ Hotels tracked for nights you need a room:
 
 | Stay | Check-in → out | Why |
 |------|----------------|-----|
-| Landing (flight Jul 16) | **Jul 16→17** | Hotel the night you land |
-| Landing (flight Jul 17) | **Jul 17→18** | Hotel the night you land |
-| Landing (flight Jul 18) | **Jul 18→19** | Hotel the night you land |
-| Post-cruise | **Jul 24→25** | After disembarkation, before Jul 25 flight home |
+| Land Jul 9 | **Jul 9→15** | Hotel until cruise embark |
+| Land Jul 10 | **Jul 10→15** | Hotel until cruise embark |
+| Land Jul 11 | **Jul 11→15** | Hotel until cruise embark |
+| Land Jul 12 | **Jul 12→15** | Hotel until cruise embark |
+| Post-cruise | **Jul 24→25** | After ship, before Jul 25 flight |
 
 - Source: Google Hotels via [`stays`](https://pypi.org/project/stays/)
 - Filter: **3★+**, 1 adult, **CAD**
