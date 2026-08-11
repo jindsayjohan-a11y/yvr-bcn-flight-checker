@@ -27,8 +27,9 @@ Cruise **Jul 15–24** = nights on the ship (**not** tracked).
 | Post-cruise | **Jul 24→25** | After ship, before Jul 25 flight home |
 
 - Source: Google Hotels via [`stays`](https://pypi.org/project/stays/)
-- Filter: **4★+**, within **2 km of Plaça de Catalunya** (Gothic / Ramblas / central Eixample)
+- Filter: **3★+** major chains only (**Marriott, Hyatt, Accor, Hilton, IHG, Four Seasons**), within **4 km of Plaça de Catalunya**
 - Email alert when cheapest is **≤ CAD 200 / night**
+- Far-out July 2027 rates are often **placeholders** (same fake total on every hotel). Those are ignored — no alert until real bookable prices appear.
 
 **Cost: $0.** Flights use [`fast-flights`](https://pypi.org/project/fast-flights/); hotels use `stays`. No credit card.
 

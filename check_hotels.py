@@ -14,10 +14,12 @@ import math
 import os
 import sys
 import time
+from collections import Counter
 from datetime import date, datetime, timezone
 from pathlib import Path
 
 from stays import (
+    Brand,
     Currency,
     DateRange,
     GuestInfo,
@@ -35,14 +37,26 @@ CITY_QUERY = "Plaça de Catalunya Barcelona"
 # Plaça de Catalunya — classic first-timer hub
 CENTER_LAT = 41.3870
 CENTER_LON = 2.1701
-MAX_KM_FROM_CENTER = 2.0
+MAX_KM_FROM_CENTER = 4.0
 
 CURRENCY = "CAD"
 ADULTS = 1
 EMAIL_TO = "bcw3bcw3@gmail.com"
-# Per-night alert (CAD) for a 4★+ hotel
+# Per-night alert (CAD) for a 3★+ major-chain hotel (Google uses whole stars;
+# 3★ includes typical 3.5★ midscale like Hampton / Holiday Inn Express)
 HOTEL_ALERT_BELOW_CAD = 200.0
-MIN_STARS = 4
+MIN_STARS = 3
+# Google Hotels brand chips — major reputable chains only
+CHAIN_BRANDS = [
+    Brand.MARRIOTT,
+    Brand.HYATT,
+    Brand.ACCOR,
+    Brand.HILTON,
+    Brand.IHG,
+    Brand.FOUR_SEASONS,
+]
+# Far-out dates often return one fake total for almost every hotel (unbookable).
+PLACEHOLDER_SAME_PRICE_RATIO = 0.5
 PAUSE_SECONDS = 2
 TOP_N = 5
 
@@ -100,6 +114,15 @@ def km_from_center(lat: float | None, lon: float | None) -> float | None:
     return 2 * r * math.asin(math.sqrt(a))
 
 
+def prices_look_like_placeholders(priced: list[dict]) -> bool:
+    """Google often shows one fake total for nearly every hotel when dates aren't open yet."""
+    if len(priced) < 3:
+        return False
+    counts = Counter(round(float(p["price"]), 2) for p in priced)
+    _top_price, top_n = counts.most_common(1)[0]
+    return (top_n / len(priced)) >= PLACEHOLDER_SAME_PRICE_RATIO
+
+
 def search_stay(check_in: str, check_out: str, nights: int) -> dict:
     filters = HotelSearchFilters(
         location=Location(query=CITY_QUERY),
@@ -112,6 +135,7 @@ def search_stay(check_in: str, check_out: str, nights: int) -> dict:
         property_type=PropertyType.HOTELS,
         sort_by=SortBy.LOWEST_PRICE,
         hotel_class=list(range(MIN_STARS, 6)),
+        brands=CHAIN_BRANDS,
     )
     empty = {
         "found": False,
@@ -157,8 +181,20 @@ def search_stay(check_in: str, check_out: str, nights: int) -> dict:
 
     if not priced:
         empty["note"] = (
-            f"No priced {MIN_STARS}★+ hotels within {MAX_KM_FROM_CENTER} km of "
-            "Plaça de Catalunya (dates may be too far out, or blocked)"
+            f"No priced {MIN_STARS}★+ Marriott/Hyatt/Accor/Hilton/IHG/Four Seasons "
+            f"hotels within {MAX_KM_FROM_CENTER} km of Plaça de Catalunya "
+            "(dates may be too far out, or blocked)"
+        )
+        return empty
+
+    if prices_look_like_placeholders(priced):
+        mode_price, mode_n = Counter(
+            round(float(p["price"]), 2) for p in priced
+        ).most_common(1)[0]
+        empty["note"] = (
+            f"Ignored placeholder Google Hotels prices "
+            f"({mode_n}/{len(priced)} hotels all show {CURRENCY} {mode_price:,.0f} — "
+            "July 2027 inventory not bookable yet)"
         )
         return empty
 

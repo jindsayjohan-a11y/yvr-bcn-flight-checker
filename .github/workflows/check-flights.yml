@@ -140,7 +140,7 @@ jobs:
                 repo: context.repo.repo,
                 name: label,
                 color: '0075ca',
-                description: 'Barcelona 4★+ hotel under CAD 200/night',
+                description: 'Barcelona 3★+ major-chain hotel under CAD 200/night',
               });
             } catch (e) {
               // 422 = already exists
