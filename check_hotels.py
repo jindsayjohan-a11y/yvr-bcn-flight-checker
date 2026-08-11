@@ -32,9 +32,9 @@ CITY = "Barcelona"
 CURRENCY = "CAD"
 ADULTS = 1
 EMAIL_TO = "bcw3bcw3@gmail.com"
-# Per-night alert (CAD) for a 3★+ hotel
+# Per-night alert (CAD) for a 4★+ hotel
 HOTEL_ALERT_BELOW_CAD = 200.0
-MIN_STARS = 3
+MIN_STARS = 4
 PAUSE_SECONDS = 2
 TOP_N = 5
 

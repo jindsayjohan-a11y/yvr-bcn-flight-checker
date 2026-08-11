@@ -207,7 +207,7 @@ def build_summary(
         "Hotels: land Jul 9–12 → embark Jul 15 + post Jul 24→25 (cruise Jul 15–24 on ship — excluded)",
         "",
         "Flight alerts: Economy ≤ 1,100 · Premium economy ≤ 1,600 · Business ≤ 2,500",
-        "Hotel alert: ≤ 200 CAD / night (3★+)",
+        "Hotel alert: ≤ 200 CAD / night (4★+)",
         "",
         "=== FLIGHTS ===",
         "",

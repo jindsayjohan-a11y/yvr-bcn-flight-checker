@@ -140,7 +140,7 @@ jobs:
                 repo: context.repo.repo,
                 name: label,
                 color: '0075ca',
-                description: 'Barcelona hotel under threshold (pre/post cruise)',
+                description: 'Barcelona 4★+ hotel under CAD 200/night',
               });
             } catch (e) {
               // 422 = already exists

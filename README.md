@@ -32,7 +32,7 @@ Hotels tracked for nights you need a room:
 | Post-cruise | **Jul 24→25** | After ship, before Jul 25 flight |
 
 - Source: Google Hotels via [`stays`](https://pypi.org/project/stays/)
-- Filter: **3★+**, 1 adult, **CAD**
+- Filter: **4★+**, 1 adult, **CAD**
 - Email alert when cheapest is **≤ CAD 200 / night**
 
 **Cost: $0.** Flights use [`fast-flights`](https://pypi.org/project/fast-flights/); hotels use `stays`. No credit card.
