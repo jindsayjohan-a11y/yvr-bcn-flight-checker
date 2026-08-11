@@ -9,6 +9,7 @@ after disembarkation before the July 25 return flight.
 from __future__ import annotations
 
 import json
+import math
 import os
 import sys
 import time
@@ -28,7 +29,13 @@ from stays import (
 
 from mailer import send_email
 
-CITY = "Barcelona"
+# Tourist-center search (Gothic / Ramblas / Plaça Catalunya area)
+CITY_QUERY = "Plaça de Catalunya Barcelona"
+# Plaça de Catalunya — classic first-timer hub
+CENTER_LAT = 41.3870
+CENTER_LON = 2.1701
+MAX_KM_FROM_CENTER = 2.0
+
 CURRENCY = "CAD"
 ADULTS = 1
 EMAIL_TO = "bcw3bcw3@gmail.com"
@@ -84,9 +91,20 @@ def stay_windows() -> list[dict]:
     return windows
 
 
+def km_from_center(lat: float | None, lon: float | None) -> float | None:
+    if lat is None or lon is None:
+        return None
+    r = 6371.0
+    la1, lo1 = math.radians(CENTER_LAT), math.radians(CENTER_LON)
+    la2, lo2 = math.radians(lat), math.radians(lon)
+    dlat, dlon = la2 - la1, lo2 - lo1
+    a = math.sin(dlat / 2) ** 2 + math.cos(la1) * math.cos(la2) * math.sin(dlon / 2) ** 2
+    return 2 * r * math.asin(math.sqrt(a))
+
+
 def search_stay(check_in: str, check_out: str, nights: int) -> dict:
     filters = HotelSearchFilters(
-        location=Location(query=CITY),
+        location=Location(query=CITY_QUERY),
         dates=DateRange(
             check_in=date.fromisoformat(check_in),
             check_out=date.fromisoformat(check_out),
@@ -106,6 +124,7 @@ def search_stay(check_in: str, check_out: str, nights: int) -> dict:
         "name": None,
         "stars": None,
         "rating": None,
+        "km_from_center": None,
         "top": [],
         "note": None,
     }
@@ -120,6 +139,9 @@ def search_stay(check_in: str, check_out: str, nights: int) -> dict:
         price = getattr(h, "display_price", None)
         if price is None:
             continue
+        km = km_from_center(getattr(h, "latitude", None), getattr(h, "longitude", None))
+        if km is None or km > MAX_KM_FROM_CENTER:
+            continue
         total = float(price)
         per_night = total / nights if nights else total
         priced.append(
@@ -131,11 +153,15 @@ def search_stay(check_in: str, check_out: str, nights: int) -> dict:
                 "stars": getattr(h, "star_class", None),
                 "rating": getattr(h, "overall_rating", None),
                 "review_count": getattr(h, "review_count", None),
+                "km_from_center": round(km, 2),
             }
         )
 
     if not priced:
-        empty["note"] = "No priced hotels (dates may be too far out, or blocked)"
+        empty["note"] = (
+            f"No priced {MIN_STARS}★+ hotels within {MAX_KM_FROM_CENTER} km of "
+            "Plaça de Catalunya (dates may be too far out, or blocked)"
+        )
         return empty
 
     priced.sort(key=lambda x: x["price_per_night"])
@@ -149,6 +175,7 @@ def search_stay(check_in: str, check_out: str, nights: int) -> dict:
         "name": best["name"],
         "stars": best["stars"],
         "rating": best["rating"],
+        "km_from_center": best["km_from_center"],
         "top": priced[:TOP_N],
         "note": None,
     }
@@ -166,25 +193,28 @@ def build_summary(run: dict) -> str:
     lines = [
         f"# Barcelona hotel check — {run['checked_at']}",
         "",
-        "- City: **Barcelona**",
+        "- City: **Barcelona** (within "
+        f"**{MAX_KM_FROM_CENTER} km** of Plaça de Catalunya — Gothic / Ramblas / central Eixample)",
         f"- Guests: {ADULTS} adult(s), {MIN_STARS}★+",
         f"- Alert: ≤ **{CURRENCY} {HOTEL_ALERT_BELOW_CAD:,.0f}** / night",
         "- Cruise Jul 15–24 = ship (not tracked)",
         "- Tracked: land Jul 9–12 → embark Jul 15 + post-cruise Jul 24→25",
         "",
-        "| Stay | Total | /night | Hotel | Stars |",
-        "|------|------:|-------:|-------|------:|",
+        "| Stay | Total | /night | Hotel | km | Stars |",
+        "|------|------:|-------:|-------|---:|------:|",
     ]
     for s in run["stays"]:
         if not s.get("found"):
             note = (s.get("note") or "no offers")[:40]
-            lines.append(f"| {s['label']} | — | — | {note} | — |")
+            lines.append(f"| {s['label']} | — | — | {note} | — | — |")
             continue
-        name = (s.get("name") or "—")[:36]
+        name = (s.get("name") or "—")[:32]
+        km = s.get("km_from_center")
+        km_s = f"{km:.1f}" if km is not None else "—"
         lines.append(
             f"| {s['label']} | {CURRENCY} {s['price']:,.0f} | "
             f"{CURRENCY} {s.get('price_per_night', s['price']):,.0f} | "
-            f"{name} | {s.get('stars') or '—'} |"
+            f"{name} | {km_s} | {s.get('stars') or '—'} |"
         )
     lines.append("")
     triggered = run.get("triggered_alerts") or []
@@ -225,6 +255,7 @@ def build_alert_payload(triggered: list[dict], checked_at: str) -> dict:
                 f"(total {CURRENCY} {a['price']:,.2f} for {a['nights']} night(s))",
                 f"  Hotel: {a['name']}",
                 f"  Stars: {a.get('stars') or 'n/a'}",
+                f"  Distance: {a.get('km_from_center', 'n/a')} km from Plaça de Catalunya",
                 f"  Check-in {a['check_in']} → out {a['check_out']}",
                 "",
             ]
@@ -236,6 +267,7 @@ def build_alert_payload(triggered: list[dict], checked_at: str) -> dict:
                 f"(total {CURRENCY} {a['price']:,.2f}, {a['nights']} night(s)) — {a['name']}",
                 f"- Check-in {a['check_in']} → out {a['check_out']}",
                 f"- Stars: {a.get('stars') or 'n/a'}",
+                f"- ~{a.get('km_from_center', 'n/a')} km from Plaça de Catalunya",
                 "",
             ]
         )
@@ -290,13 +322,16 @@ def main() -> int:
                     "price_per_night": per_night,
                     "name": result.get("name"),
                     "stars": result.get("stars"),
+                    "km_from_center": result.get("km_from_center"),
                     "threshold": HOTEL_ALERT_BELOW_CAD,
                 }
             )
 
     run = {
         "checked_at": checked_at,
-        "city": CITY,
+        "city": CITY_QUERY,
+        "center": {"name": "Plaça de Catalunya", "lat": CENTER_LAT, "lon": CENTER_LON},
+        "max_km_from_center": MAX_KM_FROM_CENTER,
         "currency": CURRENCY,
         "adults": ADULTS,
         "min_stars": MIN_STARS,
