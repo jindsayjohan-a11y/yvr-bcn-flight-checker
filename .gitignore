@@ -10,3 +10,6 @@ data/latest.json
 data/summary.md
 data/alert.json
 data/biweekly_summary.txt
+data/hotel_latest.json
+data/hotel_summary.md
+data/hotel_alert.json

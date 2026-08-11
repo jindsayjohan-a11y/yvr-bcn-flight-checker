@@ -12,12 +12,17 @@ from mailer import DEFAULT_EMAIL_TO, send_email
 
 ROOT = Path(__file__).resolve().parent
 HISTORY_PATH = ROOT / "data" / "history.jsonl"
+HOTEL_HISTORY_PATH = ROOT / "data" / "hotel_history.jsonl"
 DAYS = 14
 CURRENCY = "CAD"
 CABINS = (
     ("economy", "Economy"),
     ("premium-economy", "Premium economy"),
     ("business", "Business"),
+)
+HOTEL_STAY_IDS = (
+    ("pre_cruise", "Pre-cruise hotel (Jul 14→15)"),
+    ("post_cruise", "Post-cruise hotel (Jul 24→25)"),
 )
 
 
@@ -116,32 +121,113 @@ def section_for_cabin(
     return lines, priced
 
 
+def load_daily_hotel_lows(path: Path) -> dict[str, dict[date, dict]]:
+    """stay_id → day → cheapest hotel that day."""
+    by_stay: dict[str, dict[date, dict]] = {sid: {} for sid, _ in HOTEL_STAY_IDS}
+    if not path.exists():
+        return by_stay
+
+    with path.open() as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                run = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            day = parse_checked_day(run.get("checked_at", ""))
+            if day is None:
+                continue
+            for stay in run.get("stays") or []:
+                sid = stay.get("id")
+                if sid not in by_stay:
+                    continue
+                cheapest = stay.get("cheapest") or {}
+                bucket = by_stay[sid]
+                if not stay.get("found") or cheapest.get("price") is None:
+                    if day not in bucket:
+                        bucket[day] = {"price": None}
+                    continue
+                price = float(cheapest["price"])
+                row = {
+                    "price": price,
+                    "hotel": cheapest.get("name"),
+                    "check_in": stay.get("check_in"),
+                    "check_out": stay.get("check_out"),
+                }
+                prev = bucket.get(day)
+                if prev is None or prev.get("price") is None or price < prev["price"]:
+                    bucket[day] = row
+    return by_stay
+
+
+def section_for_hotels(
+    label: str, daily: dict[date, dict], start: date, days: int
+) -> list[str]:
+    lines = [label, "-" * 60]
+    priced: list[float] = []
+    for i in range(days):
+        day = start + timedelta(days=i)
+        row = daily.get(day)
+        if not row or row.get("price") is None:
+            lines.append(f"{day.isoformat():<12} {'—':>12}  no priced check")
+            continue
+        priced.append(row["price"])
+        hotel = (row.get("hotel") or "—")[:36]
+        lines.append(
+            f"{day.isoformat():<12} {CURRENCY} {row['price']:>7,.0f}  {hotel}"
+        )
+    lines.append("-" * 60)
+    if priced:
+        lines.append(f"Best in period: {CURRENCY} {min(priced):,.0f}")
+        lines.append(f"Days with a price: {len(priced)} / {days}")
+    else:
+        lines.append("No priced hotel checks in this period yet.")
+    lines.append("")
+    return lines
+
+
 def build_summary(
-    by_cabin: dict[str, dict[date, dict]], end: date, days: int = DAYS
+    by_cabin: dict[str, dict[date, dict]],
+    by_hotel: dict[str, dict[date, dict]],
+    end: date,
+    days: int = DAYS,
 ) -> tuple[str, str]:
     start = end - timedelta(days=days - 1)
     lines = [
-        "YVR → BCN biweekly price summary",
+        "YVR → BCN + Barcelona hotels biweekly summary",
         f"Period: {start.isoformat()} → {end.isoformat()} (UTC)",
-        "Route: outbound Jul 16–18 2027, return Jul 25 2027",
+        "Flights: outbound Jul 16–18 2027, return Jul 25 2027",
+        "Hotels: pre Jul 14→15 + post Jul 24→25 only (cruise Jul 15–24 on ship — excluded)",
         "",
-        "Alert thresholds: Economy ≤ 1,100 · Premium economy ≤ 1,600 · Business ≤ 2,500",
+        "Flight alerts: Economy ≤ 1,100 · Premium economy ≤ 1,600 · Business ≤ 2,500",
+        "Hotel alert: cheapest 1-night total ≤ 300 CAD",
+        "",
+        "=== FLIGHTS ===",
         "",
     ]
     for cabin, label in CABINS:
         section, _ = section_for_cabin(label, by_cabin.get(cabin, {}), start, days)
         lines.extend(section)
 
-    lines.append("This is automated research only — confirm on Google Flights before booking.")
+    lines.extend(["=== BARCELONA HOTELS (pre/post cruise only) ===", ""])
+    for sid, label in HOTEL_STAY_IDS:
+        lines.extend(section_for_hotels(label, by_hotel.get(sid, {}), start, days))
+
+    lines.append(
+        "This is automated research only — confirm on Google Flights / Hotels before booking."
+    )
     body = "\n".join(lines) + "\n"
-    subject = f"YVR→BCN biweekly summary ({start.isoformat()} to {end.isoformat()})"
+    subject = f"YVR→BCN + hotels biweekly summary ({start.isoformat()} to {end.isoformat()})"
     return subject, body
 
 
 def main() -> int:
     end = datetime.now(timezone.utc).date()
     by_cabin = load_daily_lows_by_cabin(HISTORY_PATH)
-    subject, body = build_summary(by_cabin, end=end, days=DAYS)
+    by_hotel = load_daily_hotel_lows(HOTEL_HISTORY_PATH)
+    subject, body = build_summary(by_cabin, by_hotel, end=end, days=DAYS)
     print(body)
     summary_path = ROOT / "data" / "biweekly_summary.txt"
     summary_path.parent.mkdir(parents=True, exist_ok=True)

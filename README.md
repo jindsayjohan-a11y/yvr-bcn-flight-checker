@@ -1,6 +1,8 @@
-# YVR → BCN flight price checker
+# YVR → BCN trip price checker
 
-Daily (and on-demand) price checks for:
+Free price tracking for your July 2027 Barcelona trip. Alerts email **bcw3bcw3@gmail.com**.
+
+## Flights
 
 | | |
 |---|---|
@@ -9,66 +11,68 @@ Daily (and on-demand) price checks for:
 | **Outbound** | 16, 17, or 18 July **2027** |
 | **Return** | 25 July **2027** |
 
-**Cost: $0.** Prices come from Google Flights via [`fast-flights`](https://pypi.org/project/fast-flights/). Alerts email **bcw3bcw3@gmail.com** when fares hit the threshold.
-
-## Stay at $0 on GitHub
-
-1. Prefer a **public** repo → Actions minutes are free.
-2. Or keep it private and stay under **2,000 free minutes/month** (daily checks use ~30).
-3. In GitHub: **Settings → Billing → Budgets** → set Actions budget to **$0** so nothing can ever charge.
-
-## Price alerts
-
-Email + GitHub Issue when any cabin hits its threshold (CAD, round-trip):
-
 | Cabin | Alert at or under |
 |-------|-------------------|
 | Economy | **CAD 1,100** |
 | Premium economy | **CAD 1,600** |
 | Business | **CAD 2,500** |
 
+## Hotels (Barcelona — outside the cruise only)
+
+Cruise is **July 15–24** (nights on the ship). Those dates are **not** tracked for hotels.
+
+| Stay | Check-in | Check-out | Why |
+|------|----------|-----------|-----|
+| Pre-cruise | **2027-07-14** | **2027-07-15** | Night before embarkation |
+| Post-cruise | **2027-07-24** | **2027-07-25** | Disembark → overnight before July 25 flight home |
+
+Hotel alert: cheapest 1-night total **≤ CAD 300** (2 adults, Google Hotels via [`stays`](https://pypi.org/project/stays/)).
+
+**Cost: $0.** Flights use [`fast-flights`](https://pypi.org/project/fast-flights/); hotels use `stays`. No credit card.
+
+## Stay at $0 on GitHub
+
+1. Prefer a **public** repo → Actions minutes are free.
+2. Or keep it private and stay under **2,000 free minutes/month**.
+3. In GitHub: **Settings → Billing → Budgets** → set Actions budget to **$0**.
+
 ### Enable email (free, no credit card)
 
-Gmail won’t let GitHub send mail with your normal password. Use an **App Password**:
-
-1. Sign into the Google account that will **send** the mail (can be `bcw3bcw3@gmail.com`)
-2. Turn on [2-Step Verification](https://myaccount.google.com/signinoptions/two-step-verification) if it isn’t already
-3. Create an [App Password](https://myaccount.google.com/apppasswords) → app “Mail” → copy the 16-character password
-4. Repo → **Settings → Secrets and variables → Actions → New repository secret**
-   - `GMAIL_USER` = that Gmail address (e.g. `bcw3bcw3@gmail.com`)
-   - `GMAIL_APP_PASSWORD` = the 16-character app password (no spaces)
-
-Alerts are sent **to** `bcw3bcw3@gmail.com` automatically.
+1. Turn on [2-Step Verification](https://myaccount.google.com/signinoptions/two-step-verification)
+2. Create an [App Password](https://myaccount.google.com/apppasswords)
+3. Repo secrets: `GMAIL_USER`, `GMAIL_APP_PASSWORD`
 
 ### Biweekly summary
 
-On the **1st and 15th** of each month, you also get an email listing the **lowest price from each day** (economy, premium economy, and business) over the past 14 days. You can trigger it anytime: **Actions → Biweekly price summary → Run workflow**.
+On the **1st and 15th**, email with daily lows for flights (all cabins) + both hotel stays over the past 14 days.
 
 ## Important caveats
 
-- **July 2027 may show “no offers” for a while.** Airlines often open schedules ~10–11 months ahead. The daily job will start returning prices once Google has them.
-- **GitHub’s servers sometimes get blocked by Google.** If Actions runs fail with “no flights” while your laptop works, run locally instead (below) or keep retrying daily — blocks come and go.
-- Prices are for research only; always confirm on Google Flights / the airline before booking.
+- July 2027 inventory can be thin or placeholder early on.
+- GitHub cloud IPs sometimes get blocked by Google — retries usually recover.
+- Confirm on Google Flights / Hotels before booking.
 
-## Run locally (most reliable free option)
+## Run locally
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python check_flights.py
+python check_hotels.py
 ```
-
-Your home IP is less likely to be blocked than a cloud datacenter.
 
 ## Schedule
 
-Default: **every 5 minutes** (GitHub’s shortest cron interval). Runs can be delayed when Actions is busy. Google may temporarily block cloud IPs if checks are too aggressive — if that happens, switch back to hourly/daily.
+**Every 5 minutes** (GitHub’s shortest cron). Flights + hotels run in the same workflow.
 
 ## Files
 
 | Path | Role |
 |------|------|
-| `check_flights.py` | Searches all three outbound dates, picks the cheapest |
-| `.github/workflows/check-flights.yml` | Daily + manual GitHub Actions job |
-| `data/` | Written on each run (`latest.json`, `history.jsonl`, `summary.md`) |
+| `check_flights.py` | Flight fares by cabin |
+| `check_hotels.py` | Barcelona hotels pre/post cruise only |
+| `send_biweekly_summary.py` | 14-day email summary |
+| `.github/workflows/check-flights.yml` | Scheduled checker |
+| `data/history.jsonl` | Flight history |
+| `data/hotel_history.jsonl` | Hotel history |
