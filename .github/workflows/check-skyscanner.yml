@@ -1,0 +1,119 @@
+name: Check Skyscanner prices
+
+on:
+  schedule:
+    # Once daily — RapidAPI free quota is limited (~12 searches/day for cabins×dates)
+    - cron: "0 15 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check YVR → BCN via Skyscanner
+        id: sky
+        env:
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          EMAIL_TO: bcw3bcw3@gmail.com
+        run: python check_skyscanner.py
+
+      - name: Persist Skyscanner history
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/skyscanner_history.jsonl
+          if git diff --staged --quiet; then
+            echo "No Skyscanner history changes to commit"
+          else
+            git commit -m "chore: update Skyscanner price history"
+            git push
+          fi
+
+      - name: Write job summary
+        if: always()
+        run: |
+          if [ -f data/skyscanner_summary.md ]; then
+            cat data/skyscanner_summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No Skyscanner summary (missing RAPIDAPI_KEY or run failed)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Notify on Skyscanner price alerts
+        if: steps.sky.outputs.skyscanner_alert == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const alert = JSON.parse(fs.readFileSync('data/skyscanner_alert.json', 'utf8'));
+            if (!alert.alert) {
+              core.info('No Skyscanner alert payload');
+              return;
+            }
+            const label = 'skyscanner-price-alert';
+            try {
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: label,
+                color: '0E7C86',
+                description: 'YVR→BCN Skyscanner fare under cabin thresholds',
+              });
+            } catch (e) {
+              // 422 = already exists
+            }
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: label,
+              state: 'open',
+            });
+            const body = `${alert.body}\n\n_Automated Skyscanner check_`;
+            if (issues.data.length) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issues.data[0].number,
+                body,
+              });
+              core.info(`Commented on existing Skyscanner alert issue #${issues.data[0].number}`);
+            } else {
+              const issue = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: alert.title,
+                body,
+                labels: [label],
+              });
+              core.info(`Opened Skyscanner alert issue #${issue.data.number}`);
+            }
+
+      - name: Upload Skyscanner artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: skyscanner-check
+          path: |
+            data/skyscanner_latest.json
+            data/skyscanner_summary.md
+            data/skyscanner_history.jsonl
+            data/skyscanner_alert.json
+          if-no-files-found: ignore

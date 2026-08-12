@@ -12,6 +12,7 @@ from mailer import DEFAULT_EMAIL_TO, send_email
 
 ROOT = Path(__file__).resolve().parent
 HISTORY_PATH = ROOT / "data" / "history.jsonl"
+SKY_HISTORY_PATH = ROOT / "data" / "skyscanner_history.jsonl"
 HOTEL_HISTORY_PATH = ROOT / "data" / "hotel_history.jsonl"
 DAYS = 14
 CURRENCY = "CAD"
@@ -192,6 +193,7 @@ def section_for_hotels(
 
 def build_summary(
     by_cabin: dict[str, dict[date, dict]],
+    by_sky: dict[str, dict[date, dict]],
     by_hotel: dict[str, dict[date, dict]],
     end: date,
     days: int = DAYS,
@@ -206,19 +208,28 @@ def build_summary(
         "Flight alerts: Economy ≤ 1,100 · Premium economy ≤ 1,600 · Business ≤ 2,500",
         "Hotel alert: ≤ 200 CAD / night (3★+ Marriott/Hyatt/Accor/Hilton/IHG/Four Seasons)",
         "",
-        "=== FLIGHTS ===",
+        "=== FLIGHTS (Google) ===",
         "",
     ]
     for cabin, label in CABINS:
         section, _ = section_for_cabin(label, by_cabin.get(cabin, {}), start, days)
         lines.extend(section)
 
+    lines.extend(["=== FLIGHTS (Skyscanner, daily) ===", ""])
+    if any(by_sky.get(c) for c, _ in CABINS):
+        for cabin, label in CABINS:
+            section, _ = section_for_cabin(label, by_sky.get(cabin, {}), start, days)
+            lines.extend(section)
+    else:
+        lines.append("No Skyscanner checks in this period yet (needs RAPIDAPI_KEY).")
+        lines.append("")
+
     lines.extend(["=== BARCELONA HOTELS (pre/post cruise only) ===", ""])
     for sid, label in HOTEL_STAY_IDS:
         lines.extend(section_for_hotels(label, by_hotel.get(sid, {}), start, days))
 
     lines.append(
-        "This is automated research only — confirm on Google Flights / Hotels before booking."
+        "This is automated research only — confirm on Google Flights / Skyscanner / Hotels before booking."
     )
     body = "\n".join(lines) + "\n"
     subject = f"YVR→BCN + hotels biweekly summary ({start.isoformat()} to {end.isoformat()})"
@@ -228,8 +239,9 @@ def build_summary(
 def main() -> int:
     end = datetime.now(timezone.utc).date()
     by_cabin = load_daily_lows_by_cabin(HISTORY_PATH)
+    by_sky = load_daily_lows_by_cabin(SKY_HISTORY_PATH)
     by_hotel = load_daily_hotel_lows(HOTEL_HISTORY_PATH)
-    subject, body = build_summary(by_cabin, by_hotel, end=end, days=DAYS)
+    subject, body = build_summary(by_cabin, by_sky, by_hotel, end=end, days=DAYS)
     print(body)
     summary_path = ROOT / "data" / "biweekly_summary.txt"
     summary_path.parent.mkdir(parents=True, exist_ok=True)
