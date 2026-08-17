@@ -3,7 +3,7 @@
 
 Cruise is July 15–24 (ship nights — not tracked).
 Tracks only:
-  - Pre-embark: 2027-07-14 → 2027-07-15
+  - Pre-embark: 2027-07-11 → 2027-07-15
   - Post-disembark: 2027-07-24 → 2027-07-25 (before return flight)
 """
 
@@ -62,7 +62,7 @@ PAUSE_SECONDS = 2
 TOP_N = 5
 
 # Outside the cruise only (ship nights Jul 15–24 excluded)
-PRE_CRUISE = ("2027-07-14", "2027-07-15")  # night before embarkation
+PRE_CRUISE = ("2027-07-11", "2027-07-15")  # land Jul 11 → embark Jul 15
 POST_CRUISE = ("2027-07-24", "2027-07-25")  # after disembark, before Jul 25 flight
 
 ROOT = Path(__file__).resolve().parent
@@ -78,7 +78,7 @@ def stay_windows() -> list[dict]:
     for stay_id, label, kind, pair in (
         (
             "pre-cruise",
-            "Pre-cruise night (Jul 14→15)",
+            "Pre-cruise hotel (Jul 11→15)",
             "pre_cruise",
             PRE_CRUISE,
         ),
@@ -311,7 +311,7 @@ def build_summary(run: dict) -> str:
         f"- Guests: {ADULTS} adult(s), {MIN_STARS}★+",
         f"- Alert: ≤ **{CURRENCY} {HOTEL_ALERT_BELOW_CAD:,.0f}** / night",
         "- Cruise Jul 15–24 = ship (**not** tracked)",
-        "- Tracked: pre-cruise **Jul 14→15** + post-cruise **Jul 24→25** only",
+        "- Tracked: pre-cruise **Jul 11→15** + post-cruise **Jul 24→25** only",
         "",
         "| Stay | Total | /night | Hotel | km | Stars |",
         "|------|------:|-------:|-------|---:|------:|",

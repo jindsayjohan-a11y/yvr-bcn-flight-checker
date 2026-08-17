@@ -36,7 +36,7 @@ Cruise **Jul 15–24** = nights on the ship (**not** tracked).
 
 | Stay | Check-in → out | Why |
 |------|----------------|-----|
-| Pre-cruise | **Jul 14→15** | Night before embarkation |
+| Pre-cruise | **Jul 11→15** | Land Jul 11 until cruise embark |
 | Post-cruise | **Jul 24→25** | After ship, before Jul 25 flight home |
 
 - Source: Google Hotels via [`stays`](https://pypi.org/project/stays/)
