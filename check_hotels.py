@@ -17,6 +17,7 @@ import time
 from collections import Counter
 from datetime import date, datetime, timezone
 from pathlib import Path
+from urllib.parse import urlencode
 
 from stays import (
     Brand,
@@ -123,6 +124,67 @@ def prices_look_like_placeholders(priced: list[dict]) -> bool:
     return (top_n / len(priced)) >= PLACEHOLDER_SAME_PRICE_RATIO
 
 
+def booking_links(
+    name: str | None,
+    check_in: str,
+    check_out: str,
+    *,
+    entity_key: str | None = None,
+    nights: int = 1,
+) -> dict[str, str]:
+    """Deep links that open the hotel with the alert dates pre-filled."""
+    hotel = (name or "").strip() or "Barcelona hotel"
+    links: dict[str, str] = {}
+    if entity_key:
+        links["google_hotels"] = (
+            "https://www.google.com/travel/hotels/entity/"
+            + entity_key
+            + "?"
+            + urlencode(
+                {
+                    "dates": f"{check_in},{check_out}",
+                    "adults": ADULTS,
+                    "curr": CURRENCY,
+                    "hl": "en-CA",
+                    "gl": "ca",
+                }
+            )
+        )
+    links["booking_com"] = (
+        "https://www.booking.com/searchresults.html?"
+        + urlencode(
+            {
+                "ss": hotel,
+                "checkin": check_in,
+                "checkout": check_out,
+                "group_adults": ADULTS,
+                "no_rooms": 1,
+                "selected_currency": CURRENCY,
+            }
+        )
+    )
+    # Accor brand site when hotel name matches a known property code
+    accor_code = ACCOR_HOTEL_CODES.get(hotel.casefold())
+    if accor_code:
+        links["accor"] = (
+            f"https://all.accor.com/booking/en/hotel/{accor_code}?"
+            + urlencode(
+                {
+                    "dateIn": check_in,
+                    "nights": max(int(nights), 1),
+                    "compositions": ADULTS,
+                    "stayplus": "false",
+                }
+            )
+        )
+    return links
+
+
+# Known Accor property codes (optional direct book links)
+ACCOR_HOTEL_CODES = {
+    "mercure barcelona condor": "9267",
+}
+
 def search_stay(check_in: str, check_out: str, nights: int) -> dict:
     filters = HotelSearchFilters(
         location=Location(query=CITY_QUERY),
@@ -147,6 +209,9 @@ def search_stay(check_in: str, check_out: str, nights: int) -> dict:
         "stars": None,
         "rating": None,
         "km_from_center": None,
+        "entity_key": None,
+        "google_hotel_id": None,
+        "booking_links": {},
         "top": [],
         "note": None,
     }
@@ -166,9 +231,11 @@ def search_stay(check_in: str, check_out: str, nights: int) -> dict:
             continue
         total = float(price)
         per_night = total / nights if nights else total
+        name = getattr(h, "name", None)
+        entity_key = getattr(h, "entity_key", None)
         priced.append(
             {
-                "name": getattr(h, "name", None),
+                "name": name,
                 "price": total,
                 "price_per_night": per_night,
                 "currency": getattr(h, "currency", None) or CURRENCY,
@@ -176,6 +243,15 @@ def search_stay(check_in: str, check_out: str, nights: int) -> dict:
                 "rating": getattr(h, "overall_rating", None),
                 "review_count": getattr(h, "review_count", None),
                 "km_from_center": round(km, 2),
+                "entity_key": entity_key,
+                "google_hotel_id": getattr(h, "google_hotel_id", None),
+                "booking_links": booking_links(
+                    name,
+                    check_in,
+                    check_out,
+                    entity_key=entity_key,
+                    nights=nights,
+                ),
             }
         )
 
@@ -210,6 +286,9 @@ def search_stay(check_in: str, check_out: str, nights: int) -> dict:
         "stars": best["stars"],
         "rating": best["rating"],
         "km_from_center": best["km_from_center"],
+        "entity_key": best.get("entity_key"),
+        "google_hotel_id": best.get("google_hotel_id"),
+        "booking_links": best.get("booking_links") or {},
         "top": priced[:TOP_N],
         "note": None,
     }
@@ -264,6 +343,36 @@ def build_summary(run: dict) -> str:
     return "\n".join(lines)
 
 
+def format_booking_links_email(links: dict[str, str]) -> list[str]:
+    labels = {
+        "google_hotels": "Google Hotels",
+        "booking_com": "Booking.com",
+        "accor": "Accor (direct)",
+    }
+    lines = ["  Book / check availability:"]
+    for key, label in labels.items():
+        url = links.get(key)
+        if url:
+            lines.append(f"    {label}: {url}")
+    if len(lines) == 1:
+        lines.append("    (no deep link available)")
+    return lines
+
+
+def format_booking_links_md(links: dict[str, str]) -> list[str]:
+    labels = {
+        "google_hotels": "Google Hotels",
+        "booking_com": "Booking.com",
+        "accor": "Accor (direct)",
+    }
+    lines = ["- **Book / check availability:**"]
+    for key, label in labels.items():
+        url = links.get(key)
+        if url:
+            lines.append(f"  - [{label}]({url})")
+    return lines
+
+
 def build_alert_payload(triggered: list[dict], checked_at: str) -> dict:
     titles = [
         f"{a['label'].split('(')[0].strip()} {CURRENCY} {a['price_per_night']:,.0f}/n"
@@ -282,6 +391,7 @@ def build_alert_payload(triggered: list[dict], checked_at: str) -> dict:
         "",
     ]
     for a in triggered:
+        links = a.get("booking_links") or {}
         email_lines.extend(
             [
                 f"{a['label']}:",
@@ -291,6 +401,7 @@ def build_alert_payload(triggered: list[dict], checked_at: str) -> dict:
                 f"  Stars: {a.get('stars') or 'n/a'}",
                 f"  Distance: {a.get('km_from_center', 'n/a')} km from Plaça de Catalunya",
                 f"  Check-in {a['check_in']} → out {a['check_out']}",
+                *format_booking_links_email(links),
                 "",
             ]
         )
@@ -302,11 +413,19 @@ def build_alert_payload(triggered: list[dict], checked_at: str) -> dict:
                 f"- Check-in {a['check_in']} → out {a['check_out']}",
                 f"- Stars: {a.get('stars') or 'n/a'}",
                 f"- ~{a.get('km_from_center', 'n/a')} km from Plaça de Catalunya",
+                *format_booking_links_md(links),
                 "",
             ]
         )
-    email_lines.append("Confirm on Google Hotels before booking.")
-    md_lines.append("Confirm on Google Hotels before booking.")
+    email_lines.extend(
+        [
+            "If a link says dates aren’t available yet, the scraped price wasn’t bookable — wait for inventory to open.",
+            "",
+        ]
+    )
+    md_lines.append(
+        "_If a link says dates aren’t available yet, the scraped price wasn’t bookable — wait for inventory to open._"
+    )
     return {
         "alert": True,
         "triggered": triggered,
@@ -357,6 +476,8 @@ def main() -> int:
                     "name": result.get("name"),
                     "stars": result.get("stars"),
                     "km_from_center": result.get("km_from_center"),
+                    "entity_key": result.get("entity_key"),
+                    "booking_links": result.get("booking_links") or {},
                     "threshold": HOTEL_ALERT_BELOW_CAD,
                 }
             )
