@@ -476,36 +476,45 @@ def build_summary(run: dict) -> str:
 
 
 def format_booking_links_email(links: dict[str, str]) -> list[str]:
-    labels = [
-        ("ota", links.get("ota_provider") or "Book now (OTA)"),
-        ("google_hotels", "Google Hotels"),
-        ("booking_com", "Booking.com"),
-        ("accor", "Accor (direct)"),
-    ]
-    lines = ["  Book / check availability:"]
-    for key, label in labels:
-        if key == "ota_provider":
-            continue
-        url = links.get(key)
-        if url and key != "ota_provider":
-            lines.append(f"    {label}: {url}")
-    if len(lines) == 1:
-        lines.append("    (no deep link available)")
+    lines: list[str] = []
+    ota = links.get("ota")
+    provider = links.get("ota_provider") or "OTA"
+    if ota:
+        lines.append(f"  BOOKABLE LINK ({provider}):")
+        lines.append(f"    {ota}")
+    else:
+        lines.append("  BOOKABLE LINK: none verified — ignore this price")
+    # Secondary search links (often show no inventory for far-out dates)
+    secondary = []
+    if links.get("google_hotels"):
+        secondary.append(f"    Google Hotels (search): {links['google_hotels']}")
+    if links.get("booking_com"):
+        secondary.append(f"    Booking.com (search): {links['booking_com']}")
+    if links.get("accor"):
+        secondary.append(f"    Accor (direct): {links['accor']}")
+    if secondary:
+        lines.append("  Other search links (may show unavailable):")
+        lines.extend(secondary)
     return lines
 
 
 def format_booking_links_md(links: dict[str, str]) -> list[str]:
-    labels = [
-        ("ota", links.get("ota_provider") or "Book now (OTA)"),
-        ("google_hotels", "Google Hotels"),
-        ("booking_com", "Booking.com"),
-        ("accor", "Accor (direct)"),
-    ]
-    lines = ["- **Book / check availability:**"]
-    for key, label in labels:
-        url = links.get(key)
-        if url:
-            lines.append(f"  - [{label}]({url})")
+    lines: list[str] = []
+    ota = links.get("ota")
+    provider = links.get("ota_provider") or "OTA"
+    if ota:
+        lines.append(f"- **BOOKABLE LINK ({provider}):** {ota}")
+    else:
+        lines.append("- **BOOKABLE LINK:** none verified — ignore this price")
+    extras = []
+    if links.get("google_hotels"):
+        extras.append(f"[Google Hotels search]({links['google_hotels']})")
+    if links.get("booking_com"):
+        extras.append(f"[Booking.com search]({links['booking_com']})")
+    if links.get("accor"):
+        extras.append(f"[Accor direct]({links['accor']})")
+    if extras:
+        lines.append(f"- Other search links (may show unavailable): {' · '.join(extras)}")
     return lines
 
 
