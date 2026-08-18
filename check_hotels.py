@@ -58,6 +58,10 @@ CHAIN_BRANDS = [
 ]
 # Far-out dates often return one fake total for almost every hotel (unbookable).
 PLACEHOLDER_SAME_PRICE_RATIO = 0.5
+# Multi-night Google list prices often don't scale with nights; treat as nightly.
+# Require real OTA rate plans (Booking/Expedia/etc.) before alerting.
+REQUIRE_OTA_RATES_FOR_ALERT = True
+OTA_VERIFY_CANDIDATES = 5
 PAUSE_SECONDS = 2
 TOP_N = 5
 
@@ -71,6 +75,11 @@ HISTORY_PATH = DATA_DIR / "hotel_history.jsonl"
 LATEST_PATH = DATA_DIR / "hotel_latest.json"
 SUMMARY_PATH = DATA_DIR / "hotel_summary.md"
 ALERT_PATH = DATA_DIR / "hotel_alert.json"
+
+# Known Accor property codes (optional direct book links)
+ACCOR_HOTEL_CODES = {
+    "mercure barcelona condor": "9267",
+}
 
 
 def stay_windows() -> list[dict]:
@@ -131,10 +140,17 @@ def booking_links(
     *,
     entity_key: str | None = None,
     nights: int = 1,
+    ota_url: str | None = None,
+    ota_provider: str | None = None,
 ) -> dict[str, str]:
     """Deep links that open the hotel with the alert dates pre-filled."""
     hotel = (name or "").strip() or "Barcelona hotel"
     links: dict[str, str] = {}
+    if ota_url:
+        key = "ota"
+        links[key] = ota_url
+        if ota_provider:
+            links["ota_provider"] = ota_provider
     if entity_key:
         links["google_hotels"] = (
             "https://www.google.com/travel/hotels/entity/"
@@ -163,7 +179,6 @@ def booking_links(
             }
         )
     )
-    # Accor brand site when hotel name matches a known property code
     accor_code = ACCOR_HOTEL_CODES.get(hotel.casefold())
     if accor_code:
         links["accor"] = (
@@ -180,10 +195,59 @@ def booking_links(
     return links
 
 
-# Known Accor property codes (optional direct book links)
-ACCOR_HOTEL_CODES = {
-    "mercure barcelona condor": "9267",
-}
+def extract_ota_rates(detail) -> list[dict]:
+    """Return bookable OTA rate plans with deeplinks from a HotelDetail."""
+    rates: list[dict] = []
+    for room in getattr(detail, "rooms", None) or []:
+        for plan in getattr(room, "rates", None) or []:
+            price = getattr(plan, "price", None)
+            url = getattr(plan, "deeplink_url", None)
+            if price is None or not url:
+                continue
+            rates.append(
+                {
+                    "price": float(price),
+                    "currency": getattr(plan, "currency", None) or CURRENCY,
+                    "provider": getattr(plan, "provider", None) or "OTA",
+                    "url": url,
+                    "room": getattr(room, "name", None),
+                }
+            )
+    rates.sort(key=lambda r: r["price"])
+    return rates
+
+
+def verify_bookable_rate(
+    entity_key: str,
+    check_in: str,
+    check_out: str,
+) -> dict | None:
+    """Confirm Google returns an OTA rate plan with a booking deeplink."""
+    try:
+        detail = SearchHotels().get_details(
+            entity_key,
+            DateRange(
+                check_in=date.fromisoformat(check_in),
+                check_out=date.fromisoformat(check_out),
+            ),
+            location=Location(query=CITY_QUERY),
+            currency=Currency.CAD,
+        )
+    except Exception:  # noqa: BLE001
+        return None
+    rates = extract_ota_rates(detail)
+    if not rates:
+        return None
+    best = rates[0]
+    return {
+        "price_per_night": best["price"],
+        "currency": CURRENCY,  # requested CAD; Google often mislabels USD
+        "provider": best["provider"],
+        "url": best["url"],
+        "room": best.get("room"),
+        "detail_display_price": getattr(detail, "display_price", None),
+    }
+
 
 def search_stay(check_in: str, check_out: str, nights: int) -> dict:
     filters = HotelSearchFilters(
@@ -212,6 +276,8 @@ def search_stay(check_in: str, check_out: str, nights: int) -> dict:
         "entity_key": None,
         "google_hotel_id": None,
         "booking_links": {},
+        "bookable": False,
+        "ota_provider": None,
         "top": [],
         "note": None,
     }
@@ -223,21 +289,24 @@ def search_stay(check_in: str, check_out: str, nights: int) -> dict:
 
     priced = []
     for h in results or []:
-        price = getattr(h, "display_price", None)
-        if price is None:
+        list_price = getattr(h, "display_price", None)
+        if list_price is None:
             continue
         km = km_from_center(getattr(h, "latitude", None), getattr(h, "longitude", None))
         if km is None or km > MAX_KM_FROM_CENTER:
             continue
-        total = float(price)
-        per_night = total / nights if nights else total
+        # Google Hotels list price is a nightly rate for the date window —
+        # it does NOT scale with nights (4-night ≈ 1-night for far-out dates).
+        per_night = float(list_price)
+        stay_total = per_night * nights if nights else per_night
         name = getattr(h, "name", None)
         entity_key = getattr(h, "entity_key", None)
         priced.append(
             {
                 "name": name,
-                "price": total,
+                "price": stay_total,
                 "price_per_night": per_night,
+                "list_price": per_night,
                 "currency": getattr(h, "currency", None) or CURRENCY,
                 "stars": getattr(h, "star_class", None),
                 "rating": getattr(h, "overall_rating", None),
@@ -245,13 +314,6 @@ def search_stay(check_in: str, check_out: str, nights: int) -> dict:
                 "km_from_center": round(km, 2),
                 "entity_key": entity_key,
                 "google_hotel_id": getattr(h, "google_hotel_id", None),
-                "booking_links": booking_links(
-                    name,
-                    check_in,
-                    check_out,
-                    entity_key=entity_key,
-                    nights=nights,
-                ),
             }
         )
 
@@ -263,9 +325,12 @@ def search_stay(check_in: str, check_out: str, nights: int) -> dict:
         )
         return empty
 
-    if prices_look_like_placeholders(priced):
+    # Placeholder filter uses the nightly list price (same fake chip on every hotel)
+    if prices_look_like_placeholders(
+        [{"price": p["list_price"]} for p in priced]
+    ):
         mode_price, mode_n = Counter(
-            round(float(p["price"]), 2) for p in priced
+            round(float(p["list_price"]), 2) for p in priced
         ).most_common(1)[0]
         empty["note"] = (
             f"Ignored placeholder Google Hotels prices "
@@ -275,9 +340,75 @@ def search_stay(check_in: str, check_out: str, nights: int) -> dict:
         return empty
 
     priced.sort(key=lambda x: x["price_per_night"])
+
+    verified = None
+    chosen = None
+    if REQUIRE_OTA_RATES_FOR_ALERT:
+        for cand in priced[:OTA_VERIFY_CANDIDATES]:
+            key = cand.get("entity_key")
+            if not key:
+                continue
+            time.sleep(0.8)
+            verified = verify_bookable_rate(key, check_in, check_out)
+            if verified:
+                chosen = cand
+                break
+        if not verified or not chosen:
+            empty["note"] = (
+                "Google list prices found, but no bookable OTA rate/deeplink "
+                f"for top {OTA_VERIFY_CANDIDATES} hotels — skipping alert"
+            )
+            empty["top"] = [
+                {
+                    "name": p["name"],
+                    "price_per_night": p["price_per_night"],
+                    "stars": p["stars"],
+                    "km_from_center": p["km_from_center"],
+                }
+                for p in priced[:TOP_N]
+            ]
+            return empty
+        per_night = float(verified["price_per_night"])
+        stay_total = per_night * nights if nights else per_night
+        links = booking_links(
+            chosen["name"],
+            check_in,
+            check_out,
+            entity_key=chosen.get("entity_key"),
+            nights=nights,
+            ota_url=verified["url"],
+            ota_provider=verified["provider"],
+        )
+        return {
+            "found": True,
+            "bookable": True,
+            "price": stay_total,
+            "price_per_night": per_night,
+            "nights": nights,
+            "currency": CURRENCY,
+            "name": chosen["name"],
+            "stars": chosen["stars"],
+            "rating": chosen["rating"],
+            "km_from_center": chosen["km_from_center"],
+            "entity_key": chosen.get("entity_key"),
+            "google_hotel_id": chosen.get("google_hotel_id"),
+            "booking_links": links,
+            "ota_provider": verified["provider"],
+            "top": priced[:TOP_N],
+            "note": None,
+        }
+
     best = priced[0]
+    links = booking_links(
+        best["name"],
+        check_in,
+        check_out,
+        entity_key=best.get("entity_key"),
+        nights=nights,
+    )
     return {
         "found": True,
+        "bookable": False,
         "price": best["price"],
         "price_per_night": best["price_per_night"],
         "nights": nights,
@@ -288,7 +419,8 @@ def search_stay(check_in: str, check_out: str, nights: int) -> dict:
         "km_from_center": best["km_from_center"],
         "entity_key": best.get("entity_key"),
         "google_hotel_id": best.get("google_hotel_id"),
-        "booking_links": best.get("booking_links") or {},
+        "booking_links": links,
+        "ota_provider": None,
         "top": priced[:TOP_N],
         "note": None,
     }
@@ -344,15 +476,18 @@ def build_summary(run: dict) -> str:
 
 
 def format_booking_links_email(links: dict[str, str]) -> list[str]:
-    labels = {
-        "google_hotels": "Google Hotels",
-        "booking_com": "Booking.com",
-        "accor": "Accor (direct)",
-    }
+    labels = [
+        ("ota", links.get("ota_provider") or "Book now (OTA)"),
+        ("google_hotels", "Google Hotels"),
+        ("booking_com", "Booking.com"),
+        ("accor", "Accor (direct)"),
+    ]
     lines = ["  Book / check availability:"]
-    for key, label in labels.items():
+    for key, label in labels:
+        if key == "ota_provider":
+            continue
         url = links.get(key)
-        if url:
+        if url and key != "ota_provider":
             lines.append(f"    {label}: {url}")
     if len(lines) == 1:
         lines.append("    (no deep link available)")
@@ -360,13 +495,14 @@ def format_booking_links_email(links: dict[str, str]) -> list[str]:
 
 
 def format_booking_links_md(links: dict[str, str]) -> list[str]:
-    labels = {
-        "google_hotels": "Google Hotels",
-        "booking_com": "Booking.com",
-        "accor": "Accor (direct)",
-    }
+    labels = [
+        ("ota", links.get("ota_provider") or "Book now (OTA)"),
+        ("google_hotels", "Google Hotels"),
+        ("booking_com", "Booking.com"),
+        ("accor", "Accor (direct)"),
+    ]
     lines = ["- **Book / check availability:**"]
-    for key, label in labels.items():
+    for key, label in labels:
         url = links.get(key)
         if url:
             lines.append(f"  - [{label}]({url})")
@@ -461,6 +597,7 @@ def main() -> int:
         per_night = result.get("price_per_night")
         if (
             result.get("found")
+            and result.get("bookable")
             and per_night is not None
             and float(per_night) <= HOTEL_ALERT_BELOW_CAD
         ):
@@ -478,6 +615,7 @@ def main() -> int:
                     "km_from_center": result.get("km_from_center"),
                     "entity_key": result.get("entity_key"),
                     "booking_links": result.get("booking_links") or {},
+                    "ota_provider": result.get("ota_provider"),
                     "threshold": HOTEL_ALERT_BELOW_CAD,
                 }
             )

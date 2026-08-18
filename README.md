@@ -42,7 +42,7 @@ Cruise **Jul 15–24** = nights on the ship (**not** tracked).
 - Source: Google Hotels via [`stays`](https://pypi.org/project/stays/)
 - Filter: **3★+** major chains only (**Marriott, Hyatt, Accor, Hilton, IHG, Four Seasons**), within **4 km of Plaça de Catalunya**
 - Email alert when cheapest is **≤ CAD 200 / night**
-- Far-out July 2027 rates are often **placeholders** (same fake total on every hotel). Those are ignored — no alert until real bookable prices appear.
+- Far-out July 2027 rates are often **placeholders**. Alerts only fire when Google returns a real **OTA booking link** (Expedia/Booking/etc.), and list prices are treated as **per night** (not divided by stay length).
 
 **Cost: $0.** Flights: Google (`fast-flights`) + optional Skyscanner (RapidAPI free). Hotels: `stays`. No paid flight APIs.
 
