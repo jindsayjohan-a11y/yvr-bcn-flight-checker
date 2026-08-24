@@ -2,6 +2,14 @@
 
 Free price tracking for your July 2027 Barcelona trip. Alerts email **bcw3bcw3@gmail.com**.
 
+## Live site
+
+Public scan board (GitHub Pages):
+
+**https://jindsayjohan-a11y.github.io/yvr-bcn-flight-checker/**
+
+Shows the latest Google Flights + hotel checks (~every 5 minutes) and daily Skyscanner when enabled.
+
 ## Flights
 
 | | |
@@ -89,12 +97,15 @@ RAPIDAPI_KEY=... python check_skyscanner.py
 
 | Path | Role |
 |------|------|
+| `docs/` | Public live site (GitHub Pages) |
+| `scripts/build_site_data.py` | Builds `docs/data.json` from history |
 | `check_flights.py` | Google Flights fares by cabin |
 | `check_skyscanner.py` | Skyscanner fares by cabin (daily) |
 | `check_hotels.py` | Barcelona hotels for landing nights + post-cruise |
 | `send_biweekly_summary.py` | 14-day email summary |
 | `.github/workflows/check-flights.yml` | Google + hotels |
 | `.github/workflows/check-skyscanner.yml` | Skyscanner daily |
+| `.github/workflows/deploy-site.yml` | Publish Pages site |
 | `data/history.jsonl` | Google flight history |
 | `data/skyscanner_history.jsonl` | Skyscanner flight history |
 | `data/hotel_history.jsonl` | Hotel history |

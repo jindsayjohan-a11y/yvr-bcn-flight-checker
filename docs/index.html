@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>YVR → BCN · live trip prices</title>
+    <meta
+      name="description"
+      content="Live Google Flights, Skyscanner, and Barcelona hotel price scans for a July 2027 YVR→BCN trip."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Syne:wght@700;800&family=Manrope:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="sky" aria-hidden="true"></div>
+
+    <header class="hero">
+      <p class="brand">YVR → BCN</p>
+      <h1>July 2027 trip prices, scanned live.</h1>
+      <p class="lede">
+        Google Flights and Barcelona hotels refresh about every five minutes.
+        Skyscanner runs once a day when an API key is set.
+      </p>
+      <div class="hero-meta" id="hero-meta">Loading latest scan…</div>
+    </header>
+
+    <main>
+      <section class="panel" id="flights">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Flights · Google</p>
+            <h2>YVR → BCN round trip</h2>
+            <p class="sub" id="flight-sub">Outbound Jul 9–12 · Return Jul 25</p>
+          </div>
+          <p class="cadence" id="flight-checked">—</p>
+        </div>
+        <div class="stat-grid" id="flight-stats"></div>
+        <div class="chart-wrap">
+          <canvas id="flight-chart" height="160" aria-label="Flight price history"></canvas>
+          <div class="chart-legend" id="flight-legend"></div>
+        </div>
+        <p class="empty" id="flight-empty" hidden>
+          No priced Google Flights offers yet for July 2027 — inventory is still
+          thin this far out.
+        </p>
+      </section>
+
+      <section class="panel" id="hotels">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Hotels · Barcelona</p>
+            <h2>Pre &amp; post cruise nights</h2>
+            <p class="sub">
+              Major chains · 3★+ · within 4 km of Plaça de Catalunya · alert ≤ CAD 200/night
+            </p>
+          </div>
+          <p class="cadence" id="hotel-checked">—</p>
+        </div>
+        <div class="stat-grid" id="hotel-stats"></div>
+        <div class="chart-wrap">
+          <canvas id="hotel-chart" height="160" aria-label="Hotel price history"></canvas>
+          <div class="chart-legend" id="hotel-legend"></div>
+        </div>
+      </section>
+
+      <section class="panel" id="skyscanner">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Flights · Skyscanner</p>
+            <h2>Daily second source</h2>
+            <p class="sub">Same cabins and alert thresholds as Google Flights</p>
+          </div>
+          <p class="cadence" id="sky-checked">—</p>
+        </div>
+        <div class="stat-grid" id="sky-stats"></div>
+        <p class="empty" id="sky-empty" hidden></p>
+      </section>
+    </main>
+
+    <footer>
+      <p>
+        Automated research only — confirm on Google Flights / Hotels / Skyscanner
+        before booking.
+      </p>
+      <p>
+        Source:
+        <a href="https://github.com/jindsayjohan-a11y/yvr-bcn-flight-checker"
+          >yvr-bcn-flight-checker</a
+        >
+      </p>
+    </footer>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

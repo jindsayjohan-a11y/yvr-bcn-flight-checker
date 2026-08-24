@@ -44,7 +44,8 @@ jobs:
             echo "No Skyscanner history file yet (skipped or failed before write)"
             exit 0
           fi
-          git add data/skyscanner_history.jsonl
+          python scripts/build_site_data.py
+          git add data/skyscanner_history.jsonl docs/data.json
           if git diff --staged --quiet; then
             echo "No Skyscanner history changes to commit"
           else
