@@ -40,6 +40,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ ! -f data/skyscanner_history.jsonl ]; then
+            echo "No Skyscanner history file yet (skipped or failed before write)"
+            exit 0
+          fi
           git add data/skyscanner_history.jsonl
           if git diff --staged --quiet; then
             echo "No Skyscanner history changes to commit"
